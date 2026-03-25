@@ -1,0 +1,14 @@
+{
+  "name": "grebbans-handover",
+  "version": "0.1.0",
+  "description": "Figma plugin — style sheet extractor with Grebbans branding",
+  "scripts": {
+    "build": "tsc && node scripts/bundle-ui.js",
+    "watch": "tsc --watch",
+    "dev": "npm run build"
+  },
+  "devDependencies": {
+    "@figma/plugin-typings": "^1.90.0",
+    "typescript": "^5.4.0"
+  }
+}
