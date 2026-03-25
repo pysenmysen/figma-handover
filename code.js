@@ -1,4 +1,8 @@
 // Grebbans Handover — code.js
+// v0.3
+
+var VERSION = '0.3';
+
 figma.showUI(__html__, { width: 480, height: 560, themeColors: true });
 
 (async function init() {
@@ -14,11 +18,11 @@ figma.showUI(__html__, { width: 480, height: 560, themeColors: true });
       id: col.id,
       name: col.name,
       colorCount: colorCount,
-      modes: col.modes.map(function(m) { return m.name; })
+      modes: col.modes.map(function(m) { return { id: m.modeId, name: m.name }; })
     };
   }).filter(function(c) { return c.colorCount > 0; });
 
-  figma.ui.postMessage({ type: 'collections', data: summary });
+  figma.ui.postMessage({ type: 'collections', data: summary, version: VERSION });
 })();
 
 figma.ui.onmessage = async function(msg) {
@@ -31,23 +35,31 @@ figma.ui.onmessage = async function(msg) {
   }
 };
 
-// ─── Resolve a value, following alias chains ──────────────────────────────────
-function resolveValue(rawVal, modeId) {
-  var MAX_DEPTH = 10;
-  var depth = 0;
+// ─── Resolve alias chain to a raw RGBA value ──────────────────────────────────
+function resolveColor(rawVal, preferredModeId) {
   var val = rawVal;
+  var depth = 0;
 
-  while (val && val.type === 'VARIABLE_ALIAS' && depth < MAX_DEPTH) {
+  while (val && typeof val === 'object' && val.type === 'VARIABLE_ALIAS') {
+    if (depth++ > 10) break;
     var ref = figma.variables.getVariableById(val.id);
     if (!ref) break;
-    // Try the requested mode first, fall back to default mode of that variable's collection
-    var col = figma.variables.getVariableCollectionById(ref.variableCollectionId);
-    var fallbackModeId = col ? col.defaultModeId : null;
-    val = ref.valuesByMode[modeId] || (fallbackModeId ? ref.valuesByMode[fallbackModeId] : null);
-    depth++;
+
+    // Get the collection for this referenced variable to find its modes
+    var refCol = figma.variables.getVariableCollectionById(ref.variableCollectionId);
+    if (!refCol) break;
+
+    // Try preferred mode first, then default mode of the referenced collection
+    var nextVal = ref.valuesByMode[preferredModeId];
+    if (!nextVal) nextVal = ref.valuesByMode[refCol.defaultModeId];
+    val = nextVal;
   }
 
-  return val;
+  // Final check — must be a real RGBA object
+  if (val && typeof val === 'object' && 'r' in val && 'g' in val && 'b' in val) {
+    return val;
+  }
+  return null;
 }
 
 async function buildFrames(collectionIds) {
@@ -55,10 +67,9 @@ async function buildFrames(collectionIds) {
   await figma.loadFontAsync({ family: 'Inter', style: 'Medium' });
 
   // Remove existing handover frames
-  var existing = figma.currentPage.findAll(function(n) {
+  figma.currentPage.findAll(function(n) {
     return n.type === 'FRAME' && n.name.startsWith('◈ Grebbans /');
-  });
-  existing.forEach(function(f) { f.remove(); });
+  }).forEach(function(f) { f.remove(); });
 
   var xOffset = 0;
   var GAP = 48;
@@ -69,11 +80,10 @@ async function buildFrames(collectionIds) {
 
     figma.ui.postMessage({ type: 'progress', step: c, total: collectionIds.length, name: col.name });
 
-    // For collections with multiple modes, build one frame per mode
-    var modes = col.modes;
-    for (var m = 0; m < modes.length; m++) {
-      var mode = modes[m];
-      var frameName = modes.length > 1
+    // One frame per mode
+    for (var m = 0; m < col.modes.length; m++) {
+      var mode = col.modes[m];
+      var frameName = col.modes.length > 1
         ? '◈ Grebbans / ' + col.name + ' · ' + mode.name
         : '◈ Grebbans / ' + col.name;
 
@@ -93,29 +103,6 @@ async function buildFrames(collectionIds) {
 }
 
 async function buildCollectionFrame(col, modeId, frameName) {
-  // Collect colour variables, group by path prefix
-  var groups = {};
-  for (var i = 0; i < col.variableIds.length; i++) {
-    var variable = figma.variables.getVariableById(col.variableIds[i]);
-    if (!variable || variable.resolvedType !== 'COLOR') continue;
-
-    var rawVal = variable.valuesByMode[modeId];
-    var resolved = resolveValue(rawVal, modeId);
-
-    if (!resolved || typeof resolved !== 'object' || !('r' in resolved)) continue;
-
-    var parts = variable.name.split('/');
-    var group = parts.length > 1 ? parts.slice(0, -1).join(' / ') : '—';
-
-    if (!groups[group]) groups[group] = [];
-    groups[group].push({
-      name: parts[parts.length - 1],
-      fullName: variable.name,
-      r: resolved.r, g: resolved.g, b: resolved.b, a: resolved.a
-    });
-  }
-
-  // ── Layout constants ──
   var SWATCH_W = 160;
   var SWATCH_H = 56;
   var LABEL_H  = 32;
@@ -124,6 +111,26 @@ async function buildCollectionFrame(col, modeId, frameName) {
   var GROUP_GAP = 24;
   var PAD      = 24;
   var COLS     = 3;
+
+  // Group resolved colours by path prefix
+  var groups = {};
+  for (var i = 0; i < col.variableIds.length; i++) {
+    var variable = figma.variables.getVariableById(col.variableIds[i]);
+    if (!variable || variable.resolvedType !== 'COLOR') continue;
+
+    var rawVal = variable.valuesByMode[modeId];
+    var resolved = resolveColor(rawVal, modeId);
+    if (!resolved) continue;
+
+    var parts = variable.name.split('/');
+    var group = parts.length > 1 ? parts.slice(0, -1).join(' / ') : '—';
+    if (!groups[group]) groups[group] = [];
+    groups[group].push({
+      name: parts[parts.length - 1],
+      fullName: variable.name,
+      r: resolved.r, g: resolved.g, b: resolved.b, a: resolved.a
+    });
+  }
 
   var outerFrame = figma.createFrame();
   outerFrame.name = frameName;
@@ -139,26 +146,22 @@ async function buildCollectionFrame(col, modeId, frameName) {
   titleText.fontName = { family: 'Inter', style: 'Medium' };
   titleText.fontSize = 18;
   titleText.fills = [{ type: 'SOLID', color: { r: 0.05, g: 0.05, b: 0.05 } }];
-  titleText.x = PAD;
-  titleText.y = y;
+  titleText.x = PAD; titleText.y = y;
   outerFrame.appendChild(titleText);
   y += 28 + 20;
 
   var groupKeys = Object.keys(groups);
 
   if (groupKeys.length === 0) {
-    // No resolved colours — show a note
     var noteText = figma.createText();
     noteText.characters = 'No resolved colours in this mode';
     noteText.fontName = { family: 'Inter', style: 'Regular' };
     noteText.fontSize = 12;
     noteText.fills = [{ type: 'SOLID', color: { r: 0.6, g: 0.6, b: 0.6 } }];
-    noteText.x = PAD;
-    noteText.y = y;
+    noteText.x = PAD; noteText.y = y;
     outerFrame.appendChild(noteText);
     y += 24 + PAD;
-    var totalWidth = PAD + COLS * SWATCH_W + (COLS - 1) * COL_GAP + PAD;
-    outerFrame.resize(totalWidth, y);
+    outerFrame.resize(PAD + COLS * SWATCH_W + (COLS - 1) * COL_GAP + PAD, y);
     return outerFrame;
   }
 
@@ -166,17 +169,15 @@ async function buildCollectionFrame(col, modeId, frameName) {
     var groupName = groupKeys[gi];
     var tokens = groups[groupName];
 
-    // Group label
     if (groupName !== '—') {
-      var groupLabel = figma.createText();
-      groupLabel.characters = groupName.toUpperCase();
-      groupLabel.fontName = { family: 'Inter', style: 'Medium' };
-      groupLabel.fontSize = 9;
-      groupLabel.letterSpacing = { value: 8, unit: 'PERCENT' };
-      groupLabel.fills = [{ type: 'SOLID', color: { r: 0.4, g: 0.4, b: 0.4 } }];
-      groupLabel.x = PAD;
-      groupLabel.y = y;
-      outerFrame.appendChild(groupLabel);
+      var lbl = figma.createText();
+      lbl.characters = groupName.toUpperCase();
+      lbl.fontName = { family: 'Inter', style: 'Medium' };
+      lbl.fontSize = 9;
+      lbl.letterSpacing = { value: 8, unit: 'PERCENT' };
+      lbl.fills = [{ type: 'SOLID', color: { r: 0.4, g: 0.4, b: 0.4 } }];
+      lbl.x = PAD; lbl.y = y;
+      outerFrame.appendChild(lbl);
       y += 18 + 8;
     }
 
@@ -185,12 +186,10 @@ async function buildCollectionFrame(col, modeId, frameName) {
 
     for (var ti = 0; ti < tokens.length; ti++) {
       var token = tokens[ti];
-      var col_x = PAD + col_i * (SWATCH_W + COL_GAP);
-
       var card = figma.createFrame();
       card.name = token.fullName;
       card.resize(SWATCH_W, SWATCH_H + LABEL_H);
-      card.x = col_x;
+      card.x = PAD + col_i * (SWATCH_W + COL_GAP);
       card.y = row_y;
       card.cornerRadius = 8;
       card.fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 } }];
@@ -198,41 +197,35 @@ async function buildCollectionFrame(col, modeId, frameName) {
       card.strokeWeight = 1;
       card.clipsContent = true;
 
-      var swatchRect = figma.createRectangle();
-      swatchRect.resize(SWATCH_W, SWATCH_H);
-      swatchRect.x = 0; swatchRect.y = 0;
+      var sw = figma.createRectangle();
+      sw.resize(SWATCH_W, SWATCH_H);
+      sw.fills = token.a < 1
+        ? [{ type: 'SOLID', color: { r: 0.9, g: 0.9, b: 0.9 } },
+           { type: 'SOLID', color: { r: token.r, g: token.g, b: token.b }, opacity: token.a }]
+        : [{ type: 'SOLID', color: { r: token.r, g: token.g, b: token.b } }];
+      card.appendChild(sw);
 
-      if (token.a < 1) {
-        swatchRect.fills = [
-          { type: 'SOLID', color: { r: 0.9, g: 0.9, b: 0.9 } },
-          { type: 'SOLID', color: { r: token.r, g: token.g, b: token.b }, opacity: token.a }
-        ];
-      } else {
-        swatchRect.fills = [{ type: 'SOLID', color: { r: token.r, g: token.g, b: token.b } }];
-      }
-      card.appendChild(swatchRect);
+      var nt = figma.createText();
+      nt.characters = token.name;
+      nt.fontName = { family: 'Inter', style: 'Medium' };
+      nt.fontSize = 10;
+      nt.fills = [{ type: 'SOLID', color: { r: 0.1, g: 0.1, b: 0.1 } }];
+      nt.x = 8; nt.y = SWATCH_H + 6;
+      nt.resize(SWATCH_W - 16, 14);
+      nt.textTruncation = 'ENDING';
+      card.appendChild(nt);
 
-      var nameText = figma.createText();
-      nameText.characters = token.name;
-      nameText.fontName = { family: 'Inter', style: 'Medium' };
-      nameText.fontSize = 10;
-      nameText.fills = [{ type: 'SOLID', color: { r: 0.1, g: 0.1, b: 0.1 } }];
-      nameText.x = 8; nameText.y = SWATCH_H + 6;
-      nameText.resize(SWATCH_W - 16, 14);
-      nameText.textTruncation = 'ENDING';
-      card.appendChild(nameText);
-
-      var hexStr = rgbToHex(token.r, token.g, token.b);
-      var alphaStr = token.a < 1 ? ' · ' + Math.round(token.a * 100) + '%' : '';
-      var hexText = figma.createText();
-      hexText.characters = hexStr + alphaStr;
-      hexText.fontName = { family: 'Inter', style: 'Regular' };
-      hexText.fontSize = 9;
-      hexText.fills = [{ type: 'SOLID', color: { r: 0.5, g: 0.5, b: 0.5 } }];
-      hexText.x = 8; hexText.y = SWATCH_H + 18;
-      hexText.resize(SWATCH_W - 16, 12);
-      hexText.textTruncation = 'ENDING';
-      card.appendChild(hexText);
+      var hex = rgbToHex(token.r, token.g, token.b);
+      var alpha = token.a < 1 ? ' · ' + Math.round(token.a * 100) + '%' : '';
+      var ht = figma.createText();
+      ht.characters = hex + alpha;
+      ht.fontName = { family: 'Inter', style: 'Regular' };
+      ht.fontSize = 9;
+      ht.fills = [{ type: 'SOLID', color: { r: 0.5, g: 0.5, b: 0.5 } }];
+      ht.x = 8; ht.y = SWATCH_H + 18;
+      ht.resize(SWATCH_W - 16, 12);
+      ht.textTruncation = 'ENDING';
+      card.appendChild(ht);
 
       outerFrame.appendChild(card);
 
@@ -243,21 +236,16 @@ async function buildCollectionFrame(col, modeId, frameName) {
       }
     }
 
-    var rowsUsed = Math.ceil(tokens.length / COLS);
-    if (col_i === 0) {
-      y = row_y + GROUP_GAP;
-    } else {
-      y = row_y + SWATCH_H + LABEL_H + GROUP_GAP;
-    }
+    y = (col_i === 0 ? row_y : row_y + SWATCH_H + LABEL_H) + GROUP_GAP;
   }
 
   y += PAD;
-  var totalWidth = PAD + COLS * SWATCH_W + (COLS - 1) * COL_GAP + PAD;
-  outerFrame.resize(totalWidth, y);
+  outerFrame.resize(PAD + COLS * SWATCH_W + (COLS - 1) * COL_GAP + PAD, y);
   return outerFrame;
 }
 
 function rgbToHex(r, g, b) {
-  var toH = function(n) { return Math.round(n * 255).toString(16).padStart(2, '0').toUpperCase(); };
-  return '#' + toH(r) + toH(g) + toH(b);
+  return '#' + [r, g, b].map(function(n) {
+    return Math.round(n * 255).toString(16).padStart(2, '0').toUpperCase();
+  }).join('');
 }

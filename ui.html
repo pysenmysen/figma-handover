@@ -131,7 +131,7 @@
   <div class="logo-mark"><span></span><span></span><span></span><span></span></div>
   <div>
     <div class="logo-name">Grebbans</div>
-    <div class="logo-sub">Colour Variables</div>
+    <div class="logo-sub" id="version">Colour Variables</div>
   </div>
 </div>
 
@@ -202,6 +202,7 @@ window.onmessage = function(e) {
   if (!msg) return;
 
   if (msg.type === 'collections') {
+    if (msg.version) document.getElementById('version').textContent = 'Colour Variables · v' + msg.version;
     collections = msg.data;
     if (!collections.length) {
       show('s-empty');
