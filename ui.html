@@ -155,7 +155,7 @@
     <div class="col-list" id="col-list"></div>
     <div class="pick-footer">
       <div class="footer-note">Existing Grebbans frames will be replaced on the current page.</div>
-      <button class="btn btn-primary" id="btn-build" disabled onclick="startBuild()">Build frames</button>
+      <button class="btn btn-ghost" id="btn-debug" onclick="runDebug()" style="font-size:10px">Debug vars</button><button class="btn btn-primary" id="btn-build" disabled onclick="startBuild()">Build frames</button>
     </div>
   </div>
 </div>
@@ -227,6 +227,7 @@ window.onmessage = function(e) {
     });
   }
 
+  if (msg.type === 'debug_result') { document.getElementById('dbg').textContent = msg.text; document.getElementById('dbg').style.display='block'; }
   if (msg.type === 'done') {
     document.getElementById('prog-bar').style.width = '100%';
     var n = Object.values(selected).filter(Boolean).length;
@@ -295,6 +296,10 @@ function startBuild() {
   parent.postMessage({ pluginMessage: { type: 'build', collectionIds: ids } }, '*');
 }
 
+function runDebug() {
+  var ids = collections.filter(function(c){ return selected[c.id]; }).map(function(c){ return c.id; });
+  if (ids.length) parent.postMessage({ pluginMessage: { type: 'debug', collectionId: ids[0] } }, '*');
+}
 function showPick() { show('s-pick'); }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -307,5 +312,5 @@ function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 </script>
-</body>
+<div id="dbg" style="display:none;position:fixed;bottom:0;left:0;right:0;background:#111;color:#7EC8A4;font-family:monospace;font-size:9px;padding:8px;max-height:200px;overflow-y:auto;white-space:pre;z-index:999"></div></body>
 </html>
