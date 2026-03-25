@@ -82,11 +82,10 @@ var FONT_FB = 'Inter';
 var F = FONT;
 
 async function loadFonts() {
-  var styles = ['Roman', 'Regular', '45 Light', '55 Roman'];
-  for (var i = 0; i < styles.length; i++) {
-    try { await figma.loadFontAsync({ family: FONT, style: styles[i] }); F = FONT; return; } catch(e) {}
-  }
-  try { await figma.loadFontAsync({ family: FONT_FB, style: 'Regular' }); F = FONT_FB; } catch(e) {}
+  // Load Inter as reliable fallback first, then try Neue Haas
+  try { await figma.loadFontAsync({ family: 'Inter', style: 'Regular' }); F = 'Inter'; } catch(e) {}
+  try { await figma.loadFontAsync({ family: FONT, style: 'Roman' }); F = FONT; return; } catch(e) {}
+  try { await figma.loadFontAsync({ family: FONT, style: 'Regular' }); F = FONT; return; } catch(e) {}
 }
 
 function txt(chars, size, r, g, b, a) {
