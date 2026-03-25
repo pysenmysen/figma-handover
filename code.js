@@ -1,6 +1,8 @@
-// Grebbans Handover — code.js v0.7
+// Grebbans Handover — code.js v0.8
 
-var VERSION = '0.7';
+var VERSION = '0.8';
+var FONT = { family: 'Inter', style: 'Regular' };
+var FONT_MED = { family: 'Inter', style: 'Medium' };
 
 figma.showUI(__html__, { width: 480, height: 560, themeColors: true });
 
@@ -13,9 +15,7 @@ figma.showUI(__html__, { width: 480, height: 560, themeColors: true });
       if (v && v.resolvedType === 'COLOR') colorCount++;
     }
     return {
-      id: col.id,
-      name: col.name,
-      colorCount: colorCount,
+      id: col.id, name: col.name, colorCount: colorCount,
       modes: col.modes.map(function(m) { return { id: m.modeId, name: m.name }; })
     };
   }).filter(function(c) { return c.colorCount > 0; });
@@ -23,35 +23,25 @@ figma.showUI(__html__, { width: 480, height: 560, themeColors: true });
 })();
 
 figma.ui.onmessage = async function(msg) {
-  if (msg.type === 'build') {
-    await buildFrames(msg.collectionIds);
-    figma.ui.postMessage({ type: 'done' });
-  }
+  if (msg.type === 'build') { await buildFrames(msg.collectionIds); figma.ui.postMessage({ type: 'done' }); }
   if (msg.type === 'close') figma.closePlugin();
 };
 
-// ─── Resolve alias chain ───────────────────────────────────────────────────────
+// ─── Resolve alias chain ──────────────────────────────────────────────────────
 function resolveColor(rawVal, preferredModeId) {
   var val = rawVal;
   var aliasName = null;
-  var aliasVariable = null;
   var depth = 0;
   while (val && typeof val === 'object' && val.type === 'VARIABLE_ALIAS') {
     if (depth++ > 10) break;
     var ref = figma.variables.getVariableById(val.id);
     if (!ref) break;
-    if (aliasName === null) {
-      var p = ref.name.split('/');
-      aliasName = p[p.length - 1];
-      aliasVariable = ref;
-    }
+    if (aliasName === null) aliasName = ref.name;
     var refCol = figma.variables.getVariableCollectionById(ref.variableCollectionId);
     var fallback = refCol ? refCol.defaultModeId : null;
     val = ref.valuesByMode[preferredModeId] || (fallback ? ref.valuesByMode[fallback] : null);
   }
-  if (val && typeof val === 'object' && 'r' in val) {
-    return { rgba: val, aliasName: aliasName, aliasVariable: aliasVariable };
-  }
+  if (val && typeof val === 'object' && 'r' in val) return { rgba: val, aliasName: aliasName };
   return null;
 }
 
@@ -69,74 +59,197 @@ function isSemantic(col) {
 }
 
 async function buildFrames(collectionIds) {
-  await figma.loadFontAsync({ family: 'Inter', style: 'Regular' });
-  await figma.loadFontAsync({ family: 'Inter', style: 'Medium' });
-
-  // Try to load Neue Haas — fall back to Inter if not available
-  var titleFont = { family: 'Inter', style: 'Medium' };
+  // Try Neue Haas, fall back to Inter
   try {
-    await figma.loadFontAsync({ family: 'Neue Haas Grotesk Display Pro', style: 'Roman' });
-    titleFont = { family: 'Neue Haas Grotesk Display Pro', style: 'Roman' };
-  } catch(e) {}
+    await figma.loadFontAsync({ family: 'Neue Haas Grotesk Display Pro', style: 'Regular' });
+    FONT = { family: 'Neue Haas Grotesk Display Pro', style: 'Regular' };
+    FONT_MED = { family: 'Neue Haas Grotesk Display Pro', style: 'Medium' };
+  } catch(e) {
+    await figma.loadFontAsync({ family: 'Inter', style: 'Regular' });
+    await figma.loadFontAsync({ family: 'Inter', style: 'Medium' });
+  }
 
   figma.currentPage.findAll(function(n) {
     return n.type === 'FRAME' && n.name.startsWith('◈ Grebbans /');
   }).forEach(function(f) { f.remove(); });
 
-  // Build one combined frame with all selected collections
-  var frame = await buildCombinedFrame(collectionIds, titleFont);
-  frame.x = 0;
-  frame.y = 0;
-  figma.currentPage.appendChild(frame);
-  figma.viewport.scrollAndZoomIntoView([frame]);
+  var xOffset = 0;
+  var GAP = 80;
+  for (var c = 0; c < collectionIds.length; c++) {
+    var col = figma.variables.getVariableCollectionById(collectionIds[c]);
+    if (!col) continue;
+    figma.ui.postMessage({ type: 'progress', step: c, total: collectionIds.length, name: col.name });
+    var frame = isSemantic(col) ? await buildThemesFrame(col) : await buildPrimitivesFrame(col);
+    frame.x = xOffset; frame.y = 0;
+    figma.currentPage.appendChild(frame);
+    xOffset += frame.width + GAP;
+  }
+  figma.viewport.scrollAndZoomIntoView(
+    figma.currentPage.findAll(function(n) { return n.type === 'FRAME' && n.name.startsWith('◈ Grebbans /'); })
+  );
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function sf(r, g, b, a) {
+  var f = { type: 'SOLID', color: { r: r, g: g, b: b } };
+  if (a !== undefined && a < 1) f.opacity = a;
+  return f;
+}
+
+function txt(chars, size, col, fontStyle) {
+  var t = figma.createText();
+  t.fontName = fontStyle === 'medium' ? FONT_MED : FONT;
+  t.fontSize = size;
+  t.characters = chars;
+  t.fills = col ? [sf(col[0], col[1], col[2], col[3])] : [sf(0,0,0,1)];
+  return t;
+}
+
+function rgbToHex(r, g, b) {
+  return '#' + [r,g,b].map(function(n){ return Math.round(n*255).toString(16).padStart(2,'0').toUpperCase(); }).join('');
+}
+
+function bindSwatch(node, variableId, r, g, b, a) {
+  try {
+    var v = figma.variables.getVariableById(variableId);
+    if (v) {
+      node.fills = [figma.variables.setBoundVariableForPaint(sf(r,g,b,a), 'color', v)];
+      return;
+    }
+  } catch(e) {}
+  node.fills = [sf(r,g,b,a)];
+}
+
+// ─── Swatch card component ────────────────────────────────────────────────────
+function makeSwatchCard(token, w) {
+  // Card: white bg, border, 8px radius, row layout
+  var SWATCH = 44, PAD = 16, GAP = 16, H = 76;
+  var card = figma.createFrame();
+  card.name = token.fullName;
+  card.resize(w, H);
+  card.cornerRadius = 8;
+  card.fills = [sf(1,1,1)];
+  card.strokes = [sf(0.88, 0.88, 0.88)];
+  card.strokeWeight = 1;
+
+  // Swatch outer (border + inner)
+  var swOut = figma.createFrame();
+  swOut.resize(SWATCH, SWATCH);
+  swOut.cornerRadius = 2.4;
+  swOut.fills = [];
+  swOut.strokes = [sf(0,0,0)];
+  swOut.strokeWeight = 1;
+  swOut.x = PAD; swOut.y = (H - SWATCH) / 2;
+  var swIn = figma.createRectangle();
+  swIn.resize(SWATCH - 4.8, SWATCH - 4.8);
+  swIn.x = 2.4; swIn.y = 2.4;
+  swIn.cornerRadius = 1;
+  bindSwatch(swIn, token.variableId, token.r, token.g, token.b, token.a);
+  swOut.appendChild(swIn);
+  card.appendChild(swOut);
+
+  // Token name
+  var nameT = txt(token.name, 12, [0.1,0.1,0.1,1]);
+  nameT.x = PAD + SWATCH + GAP;
+  nameT.y = (H - 32) / 2;
+  nameT.resize(w - PAD - SWATCH - GAP - 70 - PAD, 14);
+  nameT.textTruncation = 'ENDING';
+  card.appendChild(nameT);
+
+  // Hex
+  var hex = rgbToHex(token.r, token.g, token.b);
+  var hexT = txt('# ' + hex.replace('#',''), 12, [0.55,0.55,0.55,1]);
+  hexT.textAlignHorizontal = 'RIGHT';
+  hexT.textAutoResize = 'WIDTH_AND_HEIGHT';
+  hexT.x = w - PAD - 60;
+  hexT.y = (H - 14) / 2;
+  card.appendChild(hexT);
+
+  // Alpha
+  if (token.a < 1) {
+    var aT = txt(Math.round(token.a*100)+'%', 12, [0.55,0.55,0.55,1]);
+    aT.textAlignHorizontal = 'RIGHT';
+    aT.textAutoResize = 'WIDTH_AND_HEIGHT';
+    aT.x = w - PAD - 28;
+    aT.y = (H - 14) / 2;
+    hexT.x = w - PAD - 94;
+    card.appendChild(aT);
+  }
+
+  return card;
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// COMBINED FRAME — matches the reference design exactly
+// PRIMITIVES
 // ══════════════════════════════════════════════════════════════════════════════
-async function buildCombinedFrame(collectionIds, titleFont) {
-  var PAD         = 80;
-  var FRAME_W     = 2000;
-  var SECTION_GAP = 80;
-  var GROUP_GAP   = 40;
-  var CARD_W      = 267;
-  var CARD_H      = 76; // row height for theme rows
-  var CARD_GAP    = 8;
-  var SWATCH_SZ   = 44;
-  var GROUP_LBL_W = 445;
-  var CARDS_PER_ROW = Math.floor((FRAME_W - PAD * 2 - GROUP_LBL_W - 20) / (CARD_W + CARD_GAP));
+async function buildPrimitivesFrame(col) {
+  var PAD = 80, FRAME_W = 2000, LABEL_W = 140;
+  var CARD_W = 267, CARD_GAP = 8, CARDS_PER_ROW = 6;
+  var ROW_GAP = 8, GROUP_GAP = 32;
+  var CONTENT_X = PAD + LABEL_W + 24;
+  var CONTENT_W = FRAME_W - CONTENT_X - PAD;
+
+  // Group tokens
+  var groups = {}, groupOrder = [];
+  for (var i = 0; i < col.variableIds.length; i++) {
+    var v = figma.variables.getVariableById(col.variableIds[i]);
+    if (!v || v.resolvedType !== 'COLOR') continue;
+    var raw = v.valuesByMode[col.defaultModeId];
+    var res = resolveColor(raw, col.defaultModeId);
+    if (!res) continue;
+    var parts = v.name.split('/');
+    var gKey = parts.length > 1 ? parts.slice(0,-1).join('/') : '—';
+    var gLabel = parts.length > 1 ? parts[parts.length-2] : '—';
+    gLabel = gLabel.charAt(0).toUpperCase() + gLabel.slice(1);
+    if (!groups[gKey]) { groups[gKey] = { label: gLabel, tokens: [] }; groupOrder.push(gKey); }
+    groups[gKey].tokens.push({
+      name: '--' + v.name.replace(/\//g,'-').toLowerCase(),
+      fullName: v.name, variableId: v.id,
+      r: res.rgba.r, g: res.rgba.g, b: res.rgba.b, a: res.rgba.a
+    });
+  }
 
   var outer = figma.createFrame();
-  outer.name = '◈ Grebbans / Style Reference';
-  outer.fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 }, opacity: 0.3 }];
+  outer.name = '◈ Grebbans / ' + col.name;
+  outer.fills = [sf(1,1,1,0.3)];
   outer.cornerRadius = 40;
   outer.clipsContent = false;
+  outer.resize(FRAME_W, 100);
 
   var y = PAD;
 
-  for (var ci = 0; ci < collectionIds.length; ci++) {
-    var col = figma.variables.getVariableCollectionById(collectionIds[ci]);
-    if (!col) continue;
+  // Title
+  var titleT = txt(col.name, 64, [0,0,0,1]);
+  titleT.x = PAD; titleT.y = y;
+  titleT.textAutoResize = 'WIDTH_AND_HEIGHT';
+  outer.appendChild(titleT);
+  y += 80 + 40;
 
-    figma.ui.postMessage({ type: 'progress', step: ci, total: collectionIds.length, name: col.name });
+  for (var gi = 0; gi < groupOrder.length; gi++) {
+    var g = groups[groupOrder[gi]];
+    var tokens = g.tokens;
+    var rowsNeeded = Math.ceil(tokens.length / CARDS_PER_ROW);
+    var groupH = rowsNeeded * 76 + (rowsNeeded-1) * ROW_GAP;
 
-    // ── Section title ──
-    var titleT = figma.createText();
-    titleT.characters = col.name;
-    titleT.fontName = titleFont;
-    titleT.fontSize = 64;
-    titleT.fills = [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 } }];
-    titleT.x = PAD; titleT.y = y;
-    outer.appendChild(titleT);
-    y += 80 + 40;
-
-    if (isSemantic(col)) {
-      y = await buildThemesSection(outer, col, y, PAD, FRAME_W, CARD_W, CARD_H, CARD_GAP, SWATCH_SZ, GROUP_LBL_W, titleFont);
-    } else {
-      y = await buildPrimitivesSection(outer, col, y, PAD, FRAME_W, CARD_W, CARD_GAP, SWATCH_SZ, GROUP_LBL_W, CARDS_PER_ROW, titleFont);
+    // Group label
+    if (g.label !== '—') {
+      var lT = txt(g.label, 16, [0,0,0,0.5]);
+      lT.x = PAD; lT.y = y + (groupH - 18) / 2;
+      lT.textAutoResize = 'WIDTH_AND_HEIGHT';
+      outer.appendChild(lT);
     }
 
-    y += SECTION_GAP;
+    var col_i = 0, row_y = y;
+    for (var ti = 0; ti < tokens.length; ti++) {
+      var token = tokens[ti];
+      var card = makeSwatchCard(token, CARD_W);
+      card.x = CONTENT_X + col_i * (CARD_W + CARD_GAP);
+      card.y = row_y;
+      outer.appendChild(card);
+      col_i++;
+      if (col_i >= CARDS_PER_ROW) { col_i = 0; row_y += 76 + ROW_GAP; }
+    }
+    y = (col_i === 0 ? row_y : row_y + 76) + GROUP_GAP;
   }
 
   y += PAD;
@@ -145,301 +258,134 @@ async function buildCombinedFrame(collectionIds, titleFont) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// PRIMITIVES SECTION
-// group label (left) | wrapping row of cards
+// THEMES
+// Columns: Semantic (fixed) | Mode1 | Mode2 | Mode3...
+// Each mode col: swatch + primitive name
 // ══════════════════════════════════════════════════════════════════════════════
-async function buildPrimitivesSection(outer, col, y, PAD, FRAME_W, CARD_W, CARD_GAP, SWATCH_SZ, GROUP_LBL_W, CARDS_PER_ROW, titleFont) {
-  var ROW_H    = 76;
-  var ROW_GAP  = 8;
-  var GRP_GAP  = 40;
-  var CONTENT_X = PAD + GROUP_LBL_W + 20;
-  var CONTENT_W = FRAME_W - CONTENT_X - PAD;
-  CARDS_PER_ROW = Math.floor((CONTENT_W + CARD_GAP) / (CARD_W + CARD_GAP));
+async function buildThemesFrame(col) {
+  var PAD = 80;
+  var SEMANTIC_W = 380;
+  var MODE_W = 380;
+  var COL_GAP = 20;
+  var ROW_H = 76, ROW_GAP = 8;
+  var SWATCH = 44, SWATCH_PAD = 2.4;
+  var modes = col.modes;
+  var FRAME_W = PAD + SEMANTIC_W + COL_GAP + modes.length * (MODE_W + COL_GAP) - COL_GAP + PAD;
 
-  // Group tokens
-  var groups = {};
-  var groupOrder = [];
+  // Collect tokens
+  var tokens = [];
   for (var i = 0; i < col.variableIds.length; i++) {
-    var variable = figma.variables.getVariableById(col.variableIds[i]);
-    if (!variable || variable.resolvedType !== 'COLOR') continue;
-    var raw = variable.valuesByMode[col.defaultModeId];
-    var resolved = resolveColor(raw, col.defaultModeId);
-    if (!resolved) continue;
-    var parts = variable.name.split('/');
-    var group = parts.length > 1 ? parts[parts.length - 2] : '—';
-    var groupLabel = group.charAt(0).toUpperCase() + group.slice(1);
-    if (!groups[group]) { groups[group] = { label: groupLabel, tokens: [] }; groupOrder.push(group); }
-    groups[group].tokens.push({
-      name: parts[parts.length - 1],
-      fullName: variable.name,
-      variableId: variable.id,
-      r: resolved.rgba.r, g: resolved.rgba.g,
-      b: resolved.rgba.b, a: resolved.rgba.a
-    });
+    var v = figma.variables.getVariableById(col.variableIds[i]);
+    if (!v || v.resolvedType !== 'COLOR') continue;
+    tokens.push({ name: '--' + v.name.replace(/\//g,'-').toLowerCase(), fullName: v.name, variableId: v.id });
   }
 
-  for (var gi = 0; gi < groupOrder.length; gi++) {
-    var gKey = groupOrder[gi];
-    var g = groups[gKey];
-    var tokens = g.tokens;
-    var numRows = Math.ceil(tokens.length / CARDS_PER_ROW);
-    var groupH = numRows * ROW_H + (numRows - 1) * ROW_GAP;
+  var outer = figma.createFrame();
+  outer.name = '◈ Grebbans / ' + col.name;
+  outer.fills = [sf(1,1,1,0.3)];
+  outer.cornerRadius = 40;
+  outer.clipsContent = false;
+  outer.resize(FRAME_W, 100);
 
-    // Group label — vertically centered
-    if (g.label !== '—') {
-      var glbl = figma.createText();
-      glbl.characters = g.label;
-      glbl.fontName = titleFont;
-      glbl.fontSize = 32;
-      glbl.fills = [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 }, opacity: 0.5 }];
-      glbl.x = PAD;
-      glbl.y = y + (groupH - 35) / 2;
-      outer.appendChild(glbl);
-    }
+  var y = PAD;
 
-    var col_i = 0;
-    var row_y = y;
-
-    for (var ti = 0; ti < tokens.length; ti++) {
-      var token = tokens[ti];
-      var card = makeColorCard(token.fullName, CARD_W, ROW_H, token, SWATCH_SZ);
-      card.x = CONTENT_X + col_i * (CARD_W + CARD_GAP);
-      card.y = row_y;
-
-      // Bind variable to swatch
-      try {
-        var sw = card.findOne(function(n) { return n.name === 'swatch'; });
-        if (sw) {
-          var bf = figma.variables.setBoundVariableForPaint(
-            { type: 'SOLID', color: { r: token.r, g: token.g, b: token.b }, opacity: token.a },
-            'color',
-            figma.variables.getVariableById(token.variableId)
-          );
-          sw.fills = [bf];
-        }
-      } catch(e) {}
-
-      outer.appendChild(card);
-      col_i++;
-      if (col_i >= CARDS_PER_ROW) { col_i = 0; row_y += ROW_H + ROW_GAP; }
-    }
-
-    y = (col_i === 0 ? row_y : row_y + ROW_H) + GRP_GAP;
-  }
-
-  return y;
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// THEMES SECTION
-// Header row: Semantic | Mode1 | Mode2 ...
-// Each token row: name card | mode1 card (swatch + primitive) | mode2 card ...
-// ══════════════════════════════════════════════════════════════════════════════
-async function buildThemesSection(outer, col, y, PAD, FRAME_W, CARD_W, CARD_H, CARD_GAP, SWATCH_SZ, GROUP_LBL_W, titleFont) {
-  var ROW_H     = 76;
-  var ROW_GAP   = 8;
-  var HDR_GAP   = 16;
-  var modes     = col.modes;
-  var TOKEN_W   = GROUP_LBL_W; // semantic name col same width as group label col
-  var CONTENT_X = PAD + TOKEN_W + 20;
-  var AVAIL_W   = FRAME_W - CONTENT_X - PAD;
-  // Each mode gets equal width
-  var MODE_W    = Math.floor((AVAIL_W - (modes.length - 1) * CARD_GAP) / modes.length);
+  // Title
+  var titleT = txt(col.name, 64, [0,0,0,1]);
+  titleT.x = PAD; titleT.y = y;
+  titleT.textAutoResize = 'WIDTH_AND_HEIGHT';
+  outer.appendChild(titleT);
+  y += 80 + 40;
 
   // Column headers
-  var semHdr = figma.createText();
-  semHdr.characters = 'Semantic';
-  semHdr.fontName = titleFont;
-  semHdr.fontSize = 32;
-  semHdr.fills = [{ type: 'SOLID', color: { r: 0.35, g: 0.35, b: 0.35 } }];
-  semHdr.x = PAD; semHdr.y = y;
-  outer.appendChild(semHdr);
+  var semHdrT = txt('Semantic', 20, [0.35,0.35,0.35,1]);
+  semHdrT.x = PAD; semHdrT.y = y;
+  semHdrT.textAutoResize = 'WIDTH_AND_HEIGHT';
+  outer.appendChild(semHdrT);
 
   for (var mi = 0; mi < modes.length; mi++) {
-    var mHdr = figma.createText();
-    mHdr.characters = modes[mi].name;
-    mHdr.fontName = titleFont;
-    mHdr.fontSize = 32;
-    mHdr.fills = [{ type: 'SOLID', color: { r: 0.35, g: 0.35, b: 0.35 } }];
-    mHdr.x = CONTENT_X + mi * (MODE_W + CARD_GAP);
-    mHdr.y = y;
-    outer.appendChild(mHdr);
+    var mHdrT = txt(modes[mi].name, 20, [0.35,0.35,0.35,1]);
+    mHdrT.x = PAD + SEMANTIC_W + COL_GAP + mi * (MODE_W + COL_GAP);
+    mHdrT.y = y;
+    mHdrT.textAutoResize = 'WIDTH_AND_HEIGHT';
+    outer.appendChild(mHdrT);
   }
+  y += 32;
 
-  y += 48 + HDR_GAP;
+  // Rows
+  for (var ti = 0; ti < tokens.length; ti++) {
+    var token = tokens[ti];
+    var variable = figma.variables.getVariableById(token.variableId);
+    if (!variable) continue;
 
-  // Token rows
-  for (var ti = 0; ti < col.variableIds.length; ti++) {
-    var variable = figma.variables.getVariableById(col.variableIds[ti]);
-    if (!variable || variable.resolvedType !== 'COLOR') continue;
+    // Semantic card
+    var semCard = figma.createFrame();
+    semCard.name = token.fullName;
+    semCard.resize(SEMANTIC_W, ROW_H);
+    semCard.x = PAD; semCard.y = y;
+    semCard.cornerRadius = 8;
+    semCard.fills = [sf(1,1,1)];
+    semCard.strokes = [sf(0.88,0.88,0.88)];
+    semCard.strokeWeight = 1;
+    var semT = txt(token.name, 13, [0,0,0,1]);
+    semT.x = 16; semT.y = (ROW_H - 16) / 2;
+    semT.resize(SEMANTIC_W - 32, 16);
+    semT.textTruncation = 'ENDING';
+    semCard.appendChild(semT);
+    outer.appendChild(semCard);
 
-    var parts = variable.name.split('/');
-    var shortName = parts[parts.length - 1];
-    var cssName = '--' + variable.name.replace(/\//g, '-').toLowerCase();
-
-    // Semantic name card
-    var nameCard = figma.createFrame();
-    nameCard.name = variable.name;
-    nameCard.resize(TOKEN_W, ROW_H);
-    nameCard.x = PAD; nameCard.y = y;
-    nameCard.cornerRadius = 8;
-    nameCard.fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 } }];
-    nameCard.strokes = [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 }, opacity: 0.08 }];
-    nameCard.strokeWeight = 1;
-
-    var nt = figma.createText();
-    nt.characters = cssName;
-    nt.fontName = { family: 'Inter', style: 'Regular' };
-    nt.fontSize = 13;
-    nt.fills = [{ type: 'SOLID', color: { r: 0.1, g: 0.1, b: 0.1 } }];
-    nt.x = 16; nt.y = (ROW_H - 16) / 2;
-    nt.resize(TOKEN_W - 32, 16);
-    nt.textTruncation = 'ENDING';
-    nameCard.appendChild(nt);
-    outer.appendChild(nameCard);
-
-    // One card per mode
+    // Mode cards
     for (var mi2 = 0; mi2 < modes.length; mi2++) {
       var mode = modes[mi2];
       var raw = variable.valuesByMode[mode.id];
-      var resolved = resolveColor(raw, mode.id);
-      if (!resolved) continue;
+      var res = resolveColor(raw, mode.id);
 
-      var token = {
-        name: resolved.aliasName || shortName,
-        fullName: variable.name,
-        variableId: variable.id,
-        r: resolved.rgba.r, g: resolved.rgba.g,
-        b: resolved.rgba.b, a: resolved.rgba.a,
-        isThemeCard: true,
-        primitiveName: resolved.aliasName
-      };
-
-      var modeCard = makeColorCard(variable.name + ' / ' + mode.name, MODE_W, ROW_H, token, SWATCH_SZ);
-      modeCard.x = CONTENT_X + mi2 * (MODE_W + CARD_GAP);
+      var modeCard = figma.createFrame();
+      modeCard.name = token.fullName + ' / ' + mode.name;
+      modeCard.resize(MODE_W, ROW_H);
+      modeCard.x = PAD + SEMANTIC_W + COL_GAP + mi2 * (MODE_W + COL_GAP);
       modeCard.y = y;
-
-      // Bind variable to swatch
-      try {
-        var sw2 = modeCard.findOne(function(n) { return n.name === 'swatch'; });
-        if (sw2) {
-          var bf2 = figma.variables.setBoundVariableForPaint(
-            { type: 'SOLID', color: { r: token.r, g: token.g, b: token.b }, opacity: token.a },
-            'color',
-            figma.variables.getVariableById(token.variableId)
-          );
-          sw2.fills = [bf2];
-        }
-      } catch(e) {}
-
+      modeCard.cornerRadius = 8;
+      modeCard.fills = [sf(1,1,1)];
+      modeCard.strokes = [sf(0.88,0.88,0.88)];
+      modeCard.strokeWeight = 1;
       outer.appendChild(modeCard);
-    }
 
+      if (!res) {
+        var noT = txt('—', 13, [0.6,0.6,0.6,1]);
+        noT.x = 16; noT.y = (ROW_H-16)/2;
+        modeCard.appendChild(noT);
+        continue;
+      }
+
+      // Swatch
+      var swOut = figma.createFrame();
+      swOut.resize(SWATCH, SWATCH);
+      swOut.cornerRadius = SWATCH_PAD;
+      swOut.fills = [];
+      swOut.strokes = [sf(0,0,0)];
+      swOut.strokeWeight = 1;
+      swOut.x = 16; swOut.y = (ROW_H-SWATCH)/2;
+      var swIn = figma.createRectangle();
+      swIn.resize(SWATCH - SWATCH_PAD*2, SWATCH - SWATCH_PAD*2);
+      swIn.x = SWATCH_PAD; swIn.y = SWATCH_PAD;
+      swIn.cornerRadius = 1;
+      bindSwatch(swIn, token.variableId, res.rgba.r, res.rgba.g, res.rgba.b, res.rgba.a);
+      swOut.appendChild(swIn);
+      modeCard.appendChild(swOut);
+
+      // Primitive name
+      var primName = '--' + (res.aliasName || '').replace(/\//g,'-').toLowerCase();
+      var primT = txt(primName || '—', 13, [0.15,0.15,0.15,1]);
+      primT.x = 16 + SWATCH + 12;
+      primT.y = (ROW_H-16)/2;
+      primT.resize(MODE_W - 16 - SWATCH - 12 - 16, 16);
+      primT.textTruncation = 'ENDING';
+      modeCard.appendChild(primT);
+    }
     y += ROW_H + ROW_GAP;
   }
 
-  return y;
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// SHARED: make a colour card
-// For primitives: swatch | --name | # HEX | alpha%
-// For themes: swatch | primitive-name
-// ══════════════════════════════════════════════════════════════════════════════
-function makeColorCard(name, cardW, cardH, token, swatchSz) {
-  var card = figma.createFrame();
-  card.name = name;
-  card.resize(cardW, cardH);
-  card.cornerRadius = 8;
-  card.fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 } }];
-  card.strokes = [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 }, opacity: 0.08 }];
-  card.strokeWeight = 1;
-  card.clipsContent = false;
-
-  var PAD_IN = 16;
-
-  // Swatch container (with border, matches reference 44x44)
-  var swatchWrap = figma.createFrame();
-  swatchWrap.name = 'swatch-wrap';
-  swatchWrap.resize(swatchSz, swatchSz);
-  swatchWrap.x = PAD_IN; swatchWrap.y = (cardH - swatchSz) / 2;
-  swatchWrap.cornerRadius = 3;
-  swatchWrap.strokes = [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 }, opacity: 0.12 }];
-  swatchWrap.strokeWeight = 1;
-  swatchWrap.fills = [];
-  swatchWrap.clipsContent = true;
-
-  // Inner colour fill
-  var swatchInner = figma.createRectangle();
-  swatchInner.name = 'swatch';
-  swatchInner.resize(swatchSz - 5, swatchSz - 5);
-  swatchInner.x = 2; swatchInner.y = 2;
-  swatchInner.cornerRadius = 2;
-
-  if (token.a < 1) {
-    swatchInner.fills = [
-      { type: 'SOLID', color: { r: 0.85, g: 0.85, b: 0.85 } },
-      { type: 'SOLID', color: { r: token.r, g: token.g, b: token.b }, opacity: token.a }
-    ];
-  } else {
-    swatchInner.fills = [{ type: 'SOLID', color: { r: token.r, g: token.g, b: token.b } }];
-  }
-  swatchWrap.appendChild(swatchInner);
-  card.appendChild(swatchWrap);
-
-  var textX = PAD_IN + swatchSz + 16;
-  var textW = cardW - textX - PAD_IN;
-
-  if (token.isThemeCard) {
-    // Theme card: just show primitive name
-    var primT = figma.createText();
-    primT.characters = '--' + (token.primitiveName || token.name);
-    primT.fontName = { family: 'Inter', style: 'Regular' };
-    primT.fontSize = 13;
-    primT.fills = [{ type: 'SOLID', color: { r: 0.1, g: 0.1, b: 0.1 } }];
-    primT.x = textX; primT.y = (cardH - 16) / 2;
-    primT.resize(textW, 16);
-    primT.textTruncation = 'ENDING';
-    card.appendChild(primT);
-  } else {
-    // Primitive card: --name on top, hex + alpha below
-    var nameT = figma.createText();
-    var cssName = '--' + token.fullName.replace(/\//g, '-').toLowerCase();
-    nameT.characters = cssName;
-    nameT.fontName = { family: 'Inter', style: 'Regular' };
-    nameT.fontSize = 13;
-    nameT.fills = [{ type: 'SOLID', color: { r: 0.1, g: 0.1, b: 0.1 } }];
-    nameT.x = textX; nameT.y = (cardH - 34) / 2;
-    nameT.resize(textW, 16);
-    nameT.textTruncation = 'ENDING';
-    card.appendChild(nameT);
-
-    // Hex + alpha row
-    var hex = '# ' + rgbToHex(token.r, token.g, token.b).replace('#', '');
-    var hexT = figma.createText();
-    hexT.characters = hex;
-    hexT.fontName = { family: 'Inter', style: 'Regular' };
-    hexT.fontSize = 13;
-    hexT.fills = [{ type: 'SOLID', color: { r: 0.55, g: 0.55, b: 0.55 } }];
-    hexT.x = textX; hexT.y = (cardH - 34) / 2 + 18;
-    card.appendChild(hexT);
-
-    if (token.a < 1) {
-      var alphaT = figma.createText();
-      alphaT.characters = Math.round(token.a * 100) + '%';
-      alphaT.fontName = { family: 'Inter', style: 'Regular' };
-      alphaT.fontSize = 13;
-      alphaT.fills = [{ type: 'SOLID', color: { r: 0.55, g: 0.55, b: 0.55 } }];
-      alphaT.x = cardW - PAD_IN - 36; alphaT.y = (cardH - 34) / 2 + 18;
-      card.appendChild(alphaT);
-    }
-  }
-
-  return card;
-}
-
-function rgbToHex(r, g, b) {
-  return '#' + [r, g, b].map(function(n) {
-    return Math.round(n * 255).toString(16).padStart(2, '0').toUpperCase();
-  }).join('');
+  y += PAD;
+  outer.resize(FRAME_W, y);
+  return outer;
 }
