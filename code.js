@@ -85,7 +85,8 @@ function isSemantic(col) {
 var F = 'Inter';
 
 async function loadFonts() {
-  try { await figma.loadFontAsync({ family: 'Inter', style: 'Regular' }); F = 'Inter'; } catch(e) {}
+  await figma.loadFontAsync({ family: 'Inter', style: 'Regular' });
+  F = 'Inter';
 }
 
 function txt(chars, size, r, g, b, a) {
@@ -198,7 +199,7 @@ function buildPrimitives(outer, col) {
     row.appendChild(lbl);
 
     var cw = fr('cards','HORIZONTAL',8,0,'FIXED','AUTO');
-    cw.layoutWrap='WRAP'; cw.counterAxisSpacing=8;
+    cw.layoutWrap='WRAP';
     cw.layoutGrow=1; cw.layoutAlign='INHERIT';
     row.appendChild(cw);
 
