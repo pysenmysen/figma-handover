@@ -200,7 +200,9 @@ function buildPrimitives(outer, col) {
 
     var cw = fr('cards','HORIZONTAL',8,0,'FIXED','AUTO');
     cw.layoutWrap='WRAP';
-    cw.layoutGrow=1; cw.layoutAlign='INHERIT';
+    // 2000px frame - 80px pad each side = 1840 content - 445 label - 20 gap = 1375
+    cw.resize(1375, 100);
+    cw.layoutAlign='INHERIT';
     row.appendChild(cw);
 
     for (var ti=0; ti<g.tokens.length; ti++) {
