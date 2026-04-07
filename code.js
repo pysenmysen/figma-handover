@@ -27,6 +27,17 @@ figma.ui.onmessage = async function(msg) {
         new Promise(function(_, r) { setTimeout(r, 2000); })
       ]);
     } catch(e) {}
+    // Find and load font-family variable
+    var fontInfo = findFontVariable();
+    if (fontInfo) {
+      FONT_VAR = fontInfo.variable;
+      try {
+        await Promise.race([
+          figma.loadFontAsync({ family: fontInfo.family, style: 'Regular' }),
+          new Promise(function(_, r) { setTimeout(r, 2000); })
+        ]);
+      } catch(e) {}
+    }
     try { buildAll(msg.collectionIds); }
     catch(err) { figma.ui.postMessage({ type: 'error', message: String(err) }); return; }
     figma.ui.postMessage({ type: 'done' });
@@ -50,6 +61,30 @@ function resolveColor(raw, modeId) {
   return (val && typeof val === 'object' && 'r' in val) ? { rgba: val, aliasName: aliasName } : null;
 }
 
+// ─── Find font-family string variable ─────────────────────────────────────────
+var FONT_VAR = null;
+
+function findFontVariable() {
+  var collections = figma.variables.getLocalVariableCollections();
+  for (var ci = 0; ci < collections.length; ci++) {
+    var col = collections[ci];
+    for (var vi = 0; vi < col.variableIds.length; vi++) {
+      var v = figma.variables.getVariableById(col.variableIds[vi]);
+      if (v && v.resolvedType === 'STRING') {
+        var n = v.name.toLowerCase();
+        if (n.includes('font') && n.includes('family')) {
+          // Get the actual font family value
+          var val = v.valuesByMode[col.defaultModeId];
+          if (typeof val === 'string' && val.length > 0) {
+            return { variable: v, family: val };
+          }
+        }
+      }
+    }
+  }
+  return null;
+}
+
 function isSemantic(col) {
   var modeId = col.defaultModeId, a = 0, t = 0;
   for (var i = 0; i < col.variableIds.length; i++) {
@@ -71,6 +106,10 @@ function makeText(chars, size, r, g, b, a) {
   try { t.fontName = { family: 'Inter', style: 'Regular' }; } catch(e) {}
   t.fontSize = size;
   t.characters = String(chars);
+  // Bind --font-family variable to fontFamily if available
+  if (FONT_VAR) {
+    try { t.setBoundVariable('fontFamily', FONT_VAR); } catch(e) {}
+  }
   var fill = { type: 'SOLID', color: { r:r||0, g:g||0, b:b||0 } };
   if (a !== undefined && a < 1) fill.opacity = a;
   t.fills = [fill];
