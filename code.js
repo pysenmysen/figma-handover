@@ -154,7 +154,7 @@ function buildAll(collectionIds) {
 
   // Outer: FIXED width, column, hug height
   var outer = figma.createFrame();
-  outer.name = '◈ Grebbans / Colours';
+  outer.name = '◈ Grebbans / Colours'; // updated per collection below
   outer.fills = [];
   outer.clipsContent = false;
   outer.layoutMode = 'VERTICAL';
@@ -164,11 +164,14 @@ function buildAll(collectionIds) {
   outer.counterAxisSizingMode = 'FIXED'; // fixed width
   outer.resize(FRAME_W, 100);            // height will auto-expand
 
+  var colCount = 0;
   for (var ci = 0; ci < collectionIds.length; ci++) {
     var col = figma.variables.getVariableCollectionById(collectionIds[ci]);
     if (!col || isSemantic(col)) continue;
     figma.ui.postMessage({ type: 'progress', step: ci, total: collectionIds.length, name: col.name });
+    if (colCount === 0) outer.name = '◈ Grebbans / ' + col.name;
     buildPrimitives(outer, col);
+    colCount++;
   }
 
   figma.currentPage.appendChild(outer);
@@ -187,9 +190,12 @@ function buildPrimitives(outer, col) {
     var res = raw ? resolveColor(raw, modeId) : null;
     if (!res) continue;
     var parts = v.name.split('/');
-    var gKey = parts.length > 1 ? parts.slice(0,-1).join('/') : '__root__';
+    // Group by TOP-LEVEL path segment only (e.g. col/base/black → col/base)
+    // This merges col/base and col/base/black into one group
+    var gKey = parts.length > 1 ? parts.slice(0, 2).join('/') : '__root__';
+    var gParts = parts.length > 1 ? parts.slice(0, 2) : [col.name];
     if (!groups[gKey]) {
-      groups[gKey] = { parts: parts.length > 1 ? parts.slice(0,-1) : [col.name], tokens: [] };
+      groups[gKey] = { parts: gParts, tokens: [] };
       order.push(gKey);
     }
     groups[gKey].tokens.push({
