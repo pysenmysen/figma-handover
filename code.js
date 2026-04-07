@@ -169,7 +169,7 @@ function buildAll(collectionIds) {
     var col = figma.variables.getVariableCollectionById(collectionIds[ci]);
     if (!col || isSemantic(col)) continue;
     figma.ui.postMessage({ type: 'progress', step: ci, total: collectionIds.length, name: col.name });
-    if (colCount === 0) outer.name = '◈ Grebbans / ' + col.name;
+    if (colCount === 0) outer.name = col.name;
     buildPrimitives(outer, col);
     colCount++;
   }
@@ -232,11 +232,11 @@ function buildPrimitives(outer, col) {
 
     var nameParts = g.parts;
     for (var pi = 0; pi < nameParts.length; pi++) {
-      var pt = makeText(nameParts[pi], 16, 0, 0, 0, 0.5);
+      var pt = makeText(nameParts[pi], 16, 0, 0, 0, 1);
       pt.textAutoResize = 'WIDTH_AND_HEIGHT';
       gnc.appendChild(pt);
       if (pi < nameParts.length - 1) {
-        var sep = makeText('/', 16, 0, 0, 0, 0.5);
+        var sep = makeText('/', 16, 0, 0, 0, 1);
         sep.textAutoResize = 'WIDTH_AND_HEIGHT';
         gnc.appendChild(sep);
       }
