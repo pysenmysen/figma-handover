@@ -175,6 +175,9 @@ function buildAll(collectionIds) {
     colCount++;
   }
 
+  // Always append effects/gradients section if any exist
+  buildEffects(outer);
+
   figma.currentPage.appendChild(outer);
   figma.viewport.scrollAndZoomIntoView([outer]);
 }
@@ -572,4 +575,250 @@ function buildThemeModeCard(variable, res, primary) {
   card.appendChild(pt);
 
   return card;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// EFFECTS & GRADIENTS
+// Groups: by effect type (Drop Shadow, Inner Shadow, Blur) + Gradient paint styles
+// ══════════════════════════════════════════════════════════════════════════════
+function buildEffects(outer) {
+  // Collect effect styles grouped by type
+  var effectStyles = figma.getLocalEffectStyles();
+  var paintStyles  = figma.getLocalPaintStyles();
+
+  var groups = {}, groupOrder = [];
+
+  // ── Effect styles (shadows, blurs) ──
+  for (var i = 0; i < effectStyles.length; i++) {
+    var s = effectStyles[i];
+    if (!s.effects || s.effects.length === 0) continue;
+    // Group by primary effect type
+    var firstEffect = s.effects[0];
+    var typeName = firstEffect.type === 'DROP_SHADOW'    ? 'Drop Shadow'
+                 : firstEffect.type === 'INNER_SHADOW'   ? 'Inner Shadow'
+                 : firstEffect.type === 'LAYER_BLUR'     ? 'Blur'
+                 : firstEffect.type === 'BACKGROUND_BLUR'? 'Background Blur'
+                 : 'Other';
+    // Use path prefix if style has slashes
+    var parts = s.name.split('/');
+    var gKey = parts.length > 1 ? parts[0] : typeName;
+    if (!groups[gKey]) { groups[gKey] = { label: gKey, items: [] }; groupOrder.push(gKey); }
+    groups[gKey].items.push({ kind: 'effect', style: s, name: parts[parts.length-1] });
+  }
+
+  // ── Paint styles that are gradients ──
+  for (var j = 0; j < paintStyles.length; j++) {
+    var ps = paintStyles[j];
+    var isGradient = ps.paints && ps.paints.some(function(p) {
+      return p.type === 'GRADIENT_LINEAR' || p.type === 'GRADIENT_RADIAL' || p.type === 'GRADIENT_ANGULAR';
+    });
+    if (!isGradient) continue;
+    var pparts = ps.name.split('/');
+    var pgKey = pparts.length > 1 ? pparts[0] : 'Gradient';
+    if (!groups[pgKey]) { groups[pgKey] = { label: pgKey, items: [] }; groupOrder.push(pgKey); }
+    groups[pgKey].items.push({ kind: 'gradient', style: ps, name: pparts[pparts.length-1] });
+  }
+
+  if (groupOrder.length === 0) return; // nothing to draw
+
+  // Primitives content frame: column, 16px gap, fill
+  var content = figma.createFrame();
+  content.name = 'Effects';
+  content.fills = [];
+  content.layoutMode = 'VERTICAL';
+  content.itemSpacing = 16;
+  content.primaryAxisSizingMode = 'AUTO';
+  content.counterAxisSizingMode = 'FIXED';
+  content.layoutAlign = 'STRETCH';
+  outer.appendChild(content);
+
+  for (var gi = 0; gi < groupOrder.length; gi++) {
+    var g = groups[groupOrder[gi]];
+
+    // VaribleGroup: column, 12px gap
+    var gf = figma.createFrame();
+    gf.name = 'VaribleGroup';
+    gf.fills = [];
+    gf.layoutMode = 'VERTICAL';
+    gf.itemSpacing = 12;
+    gf.primaryAxisSizingMode = 'AUTO';
+    gf.counterAxisSizingMode = 'FIXED';
+    gf.layoutAlign = 'STRETCH';
+    content.appendChild(gf);
+
+    // Group name header
+    var gnc = figma.createFrame();
+    gnc.name = 'GroupNameContainer';
+    gnc.fills = [];
+    gnc.layoutMode = 'HORIZONTAL';
+    gnc.itemSpacing = 4;
+    gnc.counterAxisAlignItems = 'CENTER';
+    gnc.primaryAxisSizingMode = 'AUTO';
+    gnc.counterAxisSizingMode = 'AUTO';
+    gnc.layoutAlign = 'STRETCH';
+    gf.appendChild(gnc);
+
+    var lbl = makeText(g.label, 16, 0, 0, 0, 1);
+    lbl.textAutoResize = 'WIDTH_AND_HEIGHT';
+    gnc.appendChild(lbl);
+
+    // Cards wrap
+    var vf = figma.createFrame();
+    vf.name = 'Varibles';
+    vf.fills = [];
+    vf.layoutMode = 'HORIZONTAL';
+    vf.layoutWrap = 'WRAP';
+    vf.itemSpacing = 4;
+    vf.counterAxisSpacing = 4;
+    vf.primaryAxisSizingMode = 'FIXED';
+    vf.counterAxisSizingMode = 'AUTO';
+    vf.layoutAlign = 'STRETCH';
+    gf.appendChild(vf);
+
+    for (var ii = 0; ii < g.items.length; ii++) {
+      var item = g.items[ii];
+      var card = item.kind === 'gradient'
+        ? buildGradientCard(item.style, item.name)
+        : buildEffectCard(item.style, item.name);
+      vf.appendChild(card);
+    }
+  }
+}
+
+function buildEffectCard(style, label) {
+  // Card: 229.6px wide, hug height
+  var card = figma.createFrame();
+  card.name = label;
+  card.fills = [{ type: 'SOLID', color: { r:1, g:1, b:1 }, opacity: 0.8 }];
+  card.cornerRadius = 20;
+  card.layoutMode = 'HORIZONTAL';
+  card.itemSpacing = 12;
+  card.paddingLeft = card.paddingRight = card.paddingTop = card.paddingBottom = 16;
+  card.counterAxisAlignItems = 'CENTER';
+  card.primaryAxisSizingMode = 'FIXED';
+  card.counterAxisSizingMode = 'AUTO';
+  card.resize(229.6, 58);
+
+  // Preview circle showing the effect
+  var preview = figma.createEllipse();
+  preview.name = 'Preview';
+  preview.resize(26, 26);
+  preview.fills = [{ type: 'SOLID', color: { r:0.9, g:0.9, b:0.9 } }];
+  // Apply the effect to the preview shape
+  try { preview.effects = style.effects; } catch(e) {}
+  preview.layoutAlign = 'INHERIT';
+  preview.layoutGrow = 0;
+  card.appendChild(preview);
+
+  // Name + CSS value
+  var nh = figma.createFrame();
+  nh.name = 'NameHex'; nh.fills = [];
+  nh.layoutMode = 'VERTICAL';
+  nh.itemSpacing = 4;
+  nh.primaryAxisSizingMode = 'AUTO';
+  nh.counterAxisSizingMode = 'FIXED';
+  nh.primaryAxisAlignItems = 'CENTER';
+  nh.layoutGrow = 1;
+  nh.layoutAlign = 'STRETCH';
+  card.appendChild(nh);
+
+  var nameT = makeText(label, 12, 0, 0, 0, 1);
+  nameT.letterSpacing = { value: -1, unit: 'PERCENT' };
+  nameT.layoutAlign = 'STRETCH';
+  nameT.textAutoResize = 'HEIGHT';
+  nh.appendChild(nameT);
+
+  // CSS value summary
+  var cssVal = effectToCss(style.effects);
+  if (cssVal) {
+    var cssT = makeText(cssVal, 10, 0, 0, 0, 0.5);
+    cssT.letterSpacing = { value: -1, unit: 'PERCENT' };
+    cssT.layoutAlign = 'STRETCH';
+    cssT.textAutoResize = 'HEIGHT';
+    nh.appendChild(cssT);
+  }
+
+  return card;
+}
+
+function buildGradientCard(style, label) {
+  var card = figma.createFrame();
+  card.name = label;
+  card.fills = [{ type: 'SOLID', color: { r:1, g:1, b:1 }, opacity: 0.8 }];
+  card.cornerRadius = 20;
+  card.layoutMode = 'HORIZONTAL';
+  card.itemSpacing = 12;
+  card.paddingLeft = card.paddingRight = card.paddingTop = card.paddingBottom = 16;
+  card.counterAxisAlignItems = 'CENTER';
+  card.primaryAxisSizingMode = 'FIXED';
+  card.counterAxisSizingMode = 'AUTO';
+  card.resize(229.6, 58);
+
+  // Preview circle with gradient applied
+  var preview = figma.createEllipse();
+  preview.name = 'Preview';
+  preview.resize(26, 26);
+  try { preview.fills = style.paints; } catch(e) {
+    preview.fills = [{ type: 'SOLID', color: { r:0.8, g:0.8, b:0.8 } }];
+  }
+  preview.layoutAlign = 'INHERIT';
+  preview.layoutGrow = 0;
+  card.appendChild(preview);
+
+  var nh = figma.createFrame();
+  nh.name = 'NameHex'; nh.fills = [];
+  nh.layoutMode = 'VERTICAL';
+  nh.itemSpacing = 4;
+  nh.primaryAxisSizingMode = 'AUTO';
+  nh.counterAxisSizingMode = 'FIXED';
+  nh.primaryAxisAlignItems = 'CENTER';
+  nh.layoutGrow = 1;
+  nh.layoutAlign = 'STRETCH';
+  card.appendChild(nh);
+
+  var nameT = makeText(label, 12, 0, 0, 0, 1);
+  nameT.letterSpacing = { value: -1, unit: 'PERCENT' };
+  nameT.layoutAlign = 'STRETCH';
+  nameT.textAutoResize = 'HEIGHT';
+  nh.appendChild(nameT);
+
+  // Direction hint
+  var paint = style.paints[0];
+  var dir = gradientDirection(paint);
+  if (dir) {
+    var dirT = makeText(dir, 10, 0, 0, 0, 0.5);
+    dirT.letterSpacing = { value: -1, unit: 'PERCENT' };
+    dirT.layoutAlign = 'STRETCH';
+    dirT.textAutoResize = 'HEIGHT';
+    nh.appendChild(dirT);
+  }
+
+  return card;
+}
+
+function effectToCss(effects) {
+  var parts = [];
+  for (var i = 0; i < effects.length; i++) {
+    var e = effects[i];
+    if (!e.visible) continue;
+    if (e.type === 'DROP_SHADOW' || e.type === 'INNER_SHADOW') {
+      var c = e.color;
+      var inset = e.type === 'INNER_SHADOW' ? 'inset ' : '';
+      var rgba = 'rgba(' + Math.round(c.r*255) + ',' + Math.round(c.g*255) + ',' + Math.round(c.b*255) + ',' + Math.round(c.a*100)/100 + ')';
+      parts.push(inset + e.offset.x + 'px ' + e.offset.y + 'px ' + e.radius + 'px ' + rgba);
+    } else if (e.type === 'LAYER_BLUR' || e.type === 'BACKGROUND_BLUR') {
+      parts.push('blur(' + e.radius + 'px)');
+    }
+  }
+  return parts.join(', ');
+}
+
+function gradientDirection(paint) {
+  if (!paint || !paint.gradientHandlePositions) return null;
+  var handles = paint.gradientHandlePositions;
+  if (handles.length < 2) return null;
+  var dx = handles[1].x - handles[0].x;
+  var dy = handles[1].y - handles[0].y;
+  var angle = Math.round(Math.atan2(dy, dx) * 180 / Math.PI);
+  return angle + '°';
 }
