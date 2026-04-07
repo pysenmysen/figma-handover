@@ -106,14 +106,14 @@
 <div class="screen hidden" id="s-pick">
   <div class="pick">
     <div class="pick-title">Select collections to visualise</div>
-    <div class="pick-sub">Primitives only — semantic/theme collections are excluded.</div>
+    <div class="pick-sub">Select collections to visualise. Effect &amp; gradient styles are included automatically.</div>
     <div class="sel-bar">
       <span class="sel-count"><b id="count">0</b> selected</span>
       <button class="btn-link" onclick="toggleAll()">Select all</button>
     </div>
     <div class="col-list" id="col-list"></div>
     <div class="pick-footer">
-      <div class="footer-note">Existing Grebbans frames will be replaced on re-run.</div>
+      <div class="footer-note">Effect &amp; gradient styles append automatically. Frames replace on re-run.</div>
       <button class="btn btn-primary" id="btn-build" disabled onclick="startBuild()">Build frames</button>
     </div>
   </div>
@@ -179,7 +179,7 @@ window.onmessage = function(e) {
   if (msg.type === 'done') {
     document.getElementById('prog-bar').style.width = '100%';
     var n = collections.filter(function(c) { return selected[c.id]; }).length;
-    document.getElementById('done-sub').textContent = n + ' collection' + (n !== 1 ? 's' : '') + ' drawn on your canvas.';
+    document.getElementById('done-sub').textContent = n + ' collection' + (n !== 1 ? 's' : '') + ' + effects & gradients drawn on your canvas.';
     setTimeout(function() { show('s-done'); }, 300);
   }
   if (msg.type === 'error') {
