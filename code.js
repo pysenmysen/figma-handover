@@ -1,6 +1,6 @@
-// Grebbans Handover — code.js v0.10
+// Grebbans Handover — code.js v1.0
 
-var VERSION = '0.10';
+var VERSION = '1.0';
 
 figma.showUI(__html__, { width: 480, height: 560, themeColors: true });
 
@@ -19,35 +19,9 @@ figma.showUI(__html__, { width: 480, height: 560, themeColors: true });
 })();
 
 figma.ui.onmessage = async function(msg) {
-  if (msg.type === 'debug') { runDebug(msg.collectionId); }
   if (msg.type === 'build') { await buildFrame(msg.collectionIds); figma.ui.postMessage({ type: 'done' }); }
   if (msg.type === 'close') figma.closePlugin();
 };
-
-// ─── Debug: inspect first variable in collection ──────────────────────────────
-function runDebug(collectionId) {
-  var col = figma.variables.getVariableCollectionById(collectionId);
-  if (!col) { figma.ui.postMessage({ type: 'debug_result', text: 'Collection not found' }); return; }
-
-  var result = ['Collection: ' + col.name, 'DefaultModeId: ' + col.defaultModeId,
-    'Modes: ' + col.modes.map(function(m){ return m.name + '=' + m.modeId; }).join(', ')];
-
-  // Check first 3 colour variables
-  var count = 0;
-  for (var i = 0; i < col.variableIds.length && count < 3; i++) {
-    var v = figma.variables.getVariableById(col.variableIds[i]);
-    if (!v || v.resolvedType !== 'COLOR') continue;
-    count++;
-    result.push('--- Var: ' + v.name);
-    var modeKeys = Object.keys(v.valuesByMode);
-    result.push('  modeKeys: ' + modeKeys.join(', '));
-    modeKeys.forEach(function(k) {
-      var val = v.valuesByMode[k];
-      result.push('  [' + k + ']: ' + JSON.stringify(val).slice(0, 80));
-    });
-  }
-  figma.ui.postMessage({ type: 'debug_result', text: result.join('\n') });
-}
 
 // ─── Resolve alias ─────────────────────────────────────────────────────────────
 function resolveColor(rawVal, preferredModeId) {
@@ -82,19 +56,51 @@ function isSemantic(col) {
   return total > 0 && aliasCount / total > 0.5;
 }
 
-var F = 'Inter';
+// ─── Font ──────────────────────────────────────────────────────────────────────
+var FONT_FAMILY = 'Inter';
 
-async function loadFonts() {
-  await figma.loadFontAsync({ family: 'Inter', style: 'Regular' });
-  F = 'Inter';
+async function loadFonts(collections) {
+  // Try to read --font-family string variable
+  var customFont = null;
+  for (var ci = 0; ci < collections.length; ci++) {
+    var col = figma.variables.getVariableCollectionById(collections[ci]);
+    if (!col) continue;
+    for (var vi = 0; vi < col.variableIds.length; vi++) {
+      var v = figma.variables.getVariableById(col.variableIds[vi]);
+      if (v && v.resolvedType === 'STRING' && v.name.toLowerCase().includes('font-family')) {
+        var val = v.valuesByMode[col.defaultModeId];
+        if (typeof val === 'string' && val.length > 0) { customFont = val; break; }
+      }
+    }
+    if (customFont) break;
+  }
+
+  // Try custom font first, then Neue Haas, then Inter
+  var fontsToTry = [];
+  if (customFont) fontsToTry.push({ family: customFont, style: 'Regular' });
+  fontsToTry.push({ family: 'Neue Haas Grotesk Display Pro', style: 'Roman' });
+  fontsToTry.push({ family: 'Neue Haas Grotesk Display Pro', style: 'Regular' });
+  fontsToTry.push({ family: 'Inter', style: 'Regular' });
+
+  for (var fi = 0; fi < fontsToTry.length; fi++) {
+    try {
+      await figma.loadFontAsync(fontsToTry[fi]);
+      FONT_FAMILY = fontsToTry[fi].family;
+      return;
+    } catch(e) {}
+  }
 }
 
-function txt(chars, size, r, g, b, a) {
+function makeText(chars, size, r, g, b, a, align) {
   var t = figma.createText();
-  t.fontName = { family: F, style: 'Regular' };
-  t.fontSize = size || 16;
-  t.fills = [{ type: 'SOLID', color: { r: r||0, g: g||0, b: b||0 }, opacity: (a !== undefined ? a : 1) }];
+  try { t.fontName = { family: FONT_FAMILY, style: 'Regular' }; }
+  catch(e) { t.fontName = { family: 'Inter', style: 'Regular' }; }
+  t.fontSize = size;
   t.characters = String(chars);
+  var fill = { type: 'SOLID', color: { r: r||0, g: g||0, b: b||0 } };
+  if (a !== undefined && a < 1) fill.opacity = a;
+  t.fills = [fill];
+  if (align) t.textAlignHorizontal = align;
   return t;
 }
 
@@ -104,266 +110,339 @@ function solid(r, g, b, a) {
   return f;
 }
 
-function fr(name, mode, gap, pad, ps, cs) {
-  var f = figma.createFrame();
-  f.name = name || 'f'; f.fills = [];
-  f.layoutMode = mode || 'VERTICAL';
-  if (gap !== undefined) f.itemSpacing = gap;
-  if (pad !== undefined) { f.paddingLeft=f.paddingRight=f.paddingTop=f.paddingBottom=pad; }
-  f.primaryAxisSizingMode = ps || 'AUTO';
-  f.counterAxisSizingMode = cs || 'AUTO';
-  return f;
+function rgbToHex(r, g, b) {
+  return '#' + [r,g,b].map(function(n){ return Math.round(n*255).toString(16).padStart(2,'0').toUpperCase(); }).join('');
 }
 
-function rgbToHex(r,g,b) {
-  return '#'+[r,g,b].map(function(n){return Math.round(n*255).toString(16).padStart(2,'0').toUpperCase();}).join('');
-}
-
+// ══════════════════════════════════════════════════════════════════════════════
+// MAIN BUILD
+// ══════════════════════════════════════════════════════════════════════════════
 async function buildFrame(collectionIds) {
-  await loadFonts();
+  await loadFonts(collectionIds);
 
+  // Remove existing
   figma.currentPage.findAll(function(n) {
-    return n.type==='FRAME' && n.name==='◈ Grebbans / Colours';
-  }).forEach(function(f){f.remove();});
+    return n.type === 'FRAME' && n.name === '◈ Grebbans / Colours';
+  }).forEach(function(f) { f.remove(); });
 
+  // Outer wrapper: row, 20px gap, hug height
   var outer = figma.createFrame();
   outer.name = '◈ Grebbans / Colours';
-  outer.fills = [solid(1,1,1,0.3)];
-  outer.cornerRadius = 40; outer.clipsContent = false;
-  outer.layoutMode = 'VERTICAL'; outer.itemSpacing = 80;
-  outer.paddingLeft=outer.paddingRight=outer.paddingTop=outer.paddingBottom=80;
-  outer.primaryAxisSizingMode = 'AUTO'; outer.counterAxisSizingMode = 'FIXED';
-  outer.resize(2000, 200);
+  outer.fills = [];
+  outer.layoutMode = 'HORIZONTAL';
+  outer.itemSpacing = 20;
+  outer.primaryAxisSizingMode = 'AUTO';
+  outer.counterAxisSizingMode = 'AUTO';
+  outer.clipsContent = false;
 
+  // Build sections for each collection
+  var primitiveCollections = [];
+  var semanticCollections = [];
   for (var ci = 0; ci < collectionIds.length; ci++) {
     var col = figma.variables.getVariableCollectionById(collectionIds[ci]);
     if (!col) continue;
-    figma.ui.postMessage({ type: 'progress', step: ci, total: collectionIds.length, name: col.name });
-    if (isSemantic(col)) buildThemes(outer, col);
-    else buildPrimitives(outer, col);
+    if (isSemantic(col)) semanticCollections.push(col);
+    else primitiveCollections.push(col);
   }
 
-  outer.primaryAxisSizingMode = 'AUTO';
+  // For now: primitives only (as requested)
+  for (var pi = 0; pi < primitiveCollections.length; pi++) {
+    figma.ui.postMessage({ type: 'progress', step: pi, total: collectionIds.length, name: primitiveCollections[pi].name });
+    var section = buildPrimitivesSection(primitiveCollections[pi]);
+    outer.appendChild(section);
+  }
+
   figma.currentPage.appendChild(outer);
   figma.viewport.scrollAndZoomIntoView([outer]);
 }
 
-function buildPrimitives(outer, col) {
-  var t = txt(col.name, 64, 0, 0, 0, 1);
-  t.letterSpacing = { value: -1, unit: 'PERCENT' };
-  t.layoutAlign = 'STRETCH'; t.textAutoResize = 'HEIGHT';
-  outer.appendChild(t);
+// ══════════════════════════════════════════════════════════════════════════════
+// PRIMITIVES SECTION
+// Matches: dark doc panel (320px) + light primitives panel (fill)
+// ══════════════════════════════════════════════════════════════════════════════
+function buildPrimitivesSection(col) {
+  // Wrapper: row, hug
+  var wrapper = figma.createFrame();
+  wrapper.name = col.name;
+  wrapper.fills = [];
+  wrapper.layoutMode = 'HORIZONTAL';
+  wrapper.itemSpacing = 0;
+  wrapper.primaryAxisSizingMode = 'AUTO';
+  wrapper.counterAxisSizingMode = 'AUTO';
+  wrapper.clipsContent = false;
 
-  var gc = fr('groups','VERTICAL',40,0,'AUTO','FIXED');
-  gc.layoutAlign = 'STRETCH';
-  outer.appendChild(gc);
+  // ── Left: Doc panel (#272727, 320px) ──
+  var docPanel = figma.createFrame();
+  docPanel.name = 'ColourPrimitives/Doc';
+  docPanel.fills = [{ type: 'SOLID', color: { r: 0.153, g: 0.153, b: 0.153 } }]; // #272727
+  docPanel.strokes = [{ type: 'SOLID', color: { r: 0.153, g: 0.153, b: 0.153 } }];
+  docPanel.strokeWeight = 1;
+  docPanel.cornerRadius = 20;
+  docPanel.effects = [{
+    type: 'INNER_SHADOW', color: { r: 1, g: 1, b: 1, a: 0.05 },
+    offset: { x: 0, y: 0 }, radius: 4, spread: 1, visible: true, blendMode: 'NORMAL'
+  }];
+  docPanel.layoutMode = 'VERTICAL';
+  docPanel.itemSpacing = 0;
+  docPanel.paddingLeft = docPanel.paddingRight = docPanel.paddingTop = docPanel.paddingBottom = 16;
+  docPanel.primaryAxisSizingMode = 'AUTO';
+  docPanel.counterAxisSizingMode = 'FIXED';
+  docPanel.resize(320, 100);
+  docPanel.layoutAlign = 'STRETCH';
+  wrapper.appendChild(docPanel);
 
-  var groups={}, order=[];
-  for (var i=0; i<col.variableIds.length; i++) {
-    var v = figma.variables.getVariableById(col.variableIds[i]);
-    if (!v || v.resolvedType!=='COLOR') continue;
+  // Header inside doc panel
+  var header = figma.createFrame();
+  header.name = 'Header';
+  header.fills = [];
+  header.layoutMode = 'VERTICAL';
+  header.itemSpacing = 0;
+  header.paddingBottom = 16;
+  header.primaryAxisSizingMode = 'AUTO';
+  header.counterAxisSizingMode = 'FIXED';
+  header.layoutAlign = 'STRETCH';
+  docPanel.appendChild(header);
 
-    // Get value — try defaultModeId first, then any available mode
-    var modeId = col.defaultModeId;
-    var raw = v.valuesByMode[modeId];
-    if (!raw) {
-      var keys = Object.keys(v.valuesByMode);
-      if (keys.length) raw = v.valuesByMode[keys[0]];
-    }
-    if (!raw) continue;
+  var epicT = makeText('Colour', 16, 1, 1, 1, 0.7);
+  epicT.layoutAlign = 'STRETCH'; epicT.textAutoResize = 'HEIGHT';
+  header.appendChild(epicT);
 
-    var res = resolveColor(raw, modeId);
+  var instT = makeText(col.name, 16, 1, 1, 1, 1);
+  instT.layoutAlign = 'STRETCH'; instT.textAutoResize = 'HEIGHT';
+  header.appendChild(instT);
+
+  // Options divider
+  var optFrame = figma.createFrame();
+  optFrame.name = 'Options';
+  optFrame.fills = [];
+  optFrame.strokes = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1, a: 0.2 } }];
+  optFrame.strokeWeight = 0.5;
+  optFrame.strokeTopWeight = 0.5;
+  optFrame.strokeBottomWeight = 0; optFrame.strokeLeftWeight = 0; optFrame.strokeRightWeight = 0;
+  optFrame.layoutMode = 'VERTICAL';
+  optFrame.paddingTop = optFrame.paddingBottom = 12;
+  optFrame.primaryAxisSizingMode = 'AUTO';
+  optFrame.counterAxisSizingMode = 'FIXED';
+  optFrame.layoutAlign = 'STRETCH';
+  docPanel.appendChild(optFrame);
+
+  var detailsT = makeText('Details', 12, 1, 1, 1, 0.7);
+  detailsT.layoutAlign = 'STRETCH'; detailsT.textAutoResize = 'HEIGHT';
+  optFrame.appendChild(detailsT);
+
+  var descT = makeText('Primitive colours. Not used directly — applied via semantic variables in themes/modes.', 12, 1, 1, 1, 0.7);
+  descT.layoutAlign = 'STRETCH'; descT.textAutoResize = 'HEIGHT';
+  optFrame.appendChild(descT);
+
+  // ── Right: Primitives content ──
+  var primPanel = figma.createFrame();
+  primPanel.name = 'Primitives';
+  primPanel.fills = [];
+  primPanel.layoutMode = 'VERTICAL';
+  primPanel.itemSpacing = 16;
+  primPanel.primaryAxisSizingMode = 'AUTO';
+  primPanel.counterAxisSizingMode = 'AUTO';
+  primPanel.clipsContent = false;
+  wrapper.appendChild(primPanel);
+
+  // Group tokens by variable path prefix
+  var groups = {}, order = [];
+  for (var i = 0; i < col.variableIds.length; i++) {
+    var variable = figma.variables.getVariableById(col.variableIds[i]);
+    if (!variable || variable.resolvedType !== 'COLOR') continue;
+    var raw = variable.valuesByMode[col.defaultModeId];
+    if (!raw) { var ks = Object.keys(variable.valuesByMode); if (ks.length) raw = variable.valuesByMode[ks[0]]; }
+    var res = raw ? resolveColor(raw, col.defaultModeId) : null;
     if (!res) continue;
 
-    var parts = v.name.split('/');
-    var gKey = parts.length>1 ? parts.slice(0,-1).join('/') : '__root__';
-    var gLabel = parts.length>1 ? parts[parts.length-2] : col.name;
-    gLabel = gLabel.charAt(0).toUpperCase()+gLabel.slice(1);
-    if (!groups[gKey]) { groups[gKey]={label:gLabel,tokens:[]}; order.push(gKey); }
+    var parts = variable.name.split('/');
+    // Group key = everything except last segment
+    var gKey = parts.length > 1 ? parts.slice(0, -1).join('/') : '__root__';
+    if (!groups[gKey]) { groups[gKey] = { parts: parts.slice(0, -1), tokens: [] }; order.push(gKey); }
     groups[gKey].tokens.push({
-      name:'--'+v.name.replace(/\//g,'-').toLowerCase(),
-      fullName:v.name, variableId:v.id,
-      r:res.rgba.r, g:res.rgba.g, b:res.rgba.b, a:res.rgba.a
+      name: '--' + variable.name.replace(/\//g, '-').toLowerCase(),
+      fullName: variable.name, variableId: variable.id,
+      r: res.rgba.r, g: res.rgba.g, b: res.rgba.b, a: res.rgba.a
     });
   }
 
-  for (var gi=0; gi<order.length; gi++) {
-    var g = groups[order[gi]];
-    var row = fr(g.label,'HORIZONTAL',20,0,'AUTO','FIXED');
-    row.layoutAlign='STRETCH'; row.counterAxisAlignItems='MIN';
-    gc.appendChild(row);
-
-    var lbl = txt(g.label,32,0,0,0,0.5);
-    lbl.resize(445,40); lbl.textAutoResize='HEIGHT';
-    lbl.layoutAlign='INHERIT'; lbl.layoutGrow=0;
-    row.appendChild(lbl);
-
-    var cw = fr('cards','HORIZONTAL',8,0,'FIXED','AUTO');
-    cw.layoutWrap='WRAP';
-    // 2000px frame - 80px pad each side = 1840 content - 445 label - 20 gap = 1375
-    cw.resize(1375, 100);
-    cw.layoutAlign='INHERIT';
-    row.appendChild(cw);
-
-    for (var ti=0; ti<g.tokens.length; ti++) {
-      cw.appendChild(makeCard(g.tokens[ti]));
-    }
+  // Build each group
+  for (var gi = 0; gi < order.length; gi++) {
+    var gKey = order[gi];
+    var g = groups[gKey];
+    var groupFrame = buildVariableGroup(g, col);
+    primPanel.appendChild(groupFrame);
   }
+
+  return wrapper;
 }
 
-function makeCard(token) {
-  var card = figma.createFrame();
-  card.name=token.fullName; card.fills=[solid(1,1,1,1)]; card.cornerRadius=8;
-  card.layoutMode='HORIZONTAL'; card.itemSpacing=16;
-  card.paddingLeft=card.paddingRight=card.paddingTop=card.paddingBottom=16;
-  card.primaryAxisSizingMode='FIXED'; card.counterAxisSizingMode='AUTO';
-  card.counterAxisAlignItems='CENTER'; card.resize(267.6,76);
+function buildVariableGroup(g, col) {
+  // VaribleGroup: column, 12px gap, fill
+  var gf = figma.createFrame();
+  gf.name = 'VaribleGroup';
+  gf.fills = [];
+  gf.layoutMode = 'VERTICAL';
+  gf.itemSpacing = 12;
+  gf.primaryAxisSizingMode = 'AUTO';
+  gf.counterAxisSizingMode = 'AUTO';
 
-  // Swatch
-  var so=figma.createFrame(); so.name='Color'; so.fills=[];
-  so.strokes=[{type:'SOLID',color:{r:0,g:0,b:0}}]; so.strokeWeight=1;
-  so.cornerRadius=2.4; so.layoutMode='VERTICAL';
-  so.paddingLeft=so.paddingRight=so.paddingTop=so.paddingBottom=2.4;
-  so.primaryAxisSizingMode='FIXED'; so.counterAxisSizingMode='FIXED';
-  so.resize(44,44); so.layoutAlign='INHERIT'; so.layoutGrow=0;
+  // GroupNameContainer: row, center, 4px gap
+  var gnc = figma.createFrame();
+  gnc.name = 'GroupNameContainer';
+  gnc.fills = [];
+  gnc.layoutMode = 'HORIZONTAL';
+  gnc.itemSpacing = 4;
+  gnc.counterAxisAlignItems = 'CENTER';
+  gnc.primaryAxisSizingMode = 'AUTO';
+  gnc.counterAxisSizingMode = 'AUTO';
+  gf.appendChild(gnc);
+
+  // Group name parts separated by "/"
+  var parts = g.parts;
+  if (parts.length === 0) parts = ['—'];
+  for (var pi = 0; pi < parts.length; pi++) {
+    var pt = makeText(parts[pi], 16, 0, 0, 0, 0.5);
+    pt.textAutoResize = 'WIDTH_AND_HEIGHT';
+    gnc.appendChild(pt);
+    if (pi < parts.length - 1) {
+      var sep = makeText('/', 16, 0, 0, 0, 0.5);
+      sep.textAutoResize = 'WIDTH_AND_HEIGHT';
+      gnc.appendChild(sep);
+    }
+  }
+
+  // Varibles: row, wrap, 4px gap
+  var vf = figma.createFrame();
+  vf.name = 'Varibles';
+  vf.fills = [];
+  vf.layoutMode = 'HORIZONTAL';
+  vf.layoutWrap = 'WRAP';
+  vf.itemSpacing = 4;
+  vf.primaryAxisSizingMode = 'AUTO';
+  vf.counterAxisSizingMode = 'AUTO';
+  gf.appendChild(vf);
+
+  for (var ti = 0; ti < g.tokens.length; ti++) {
+    vf.appendChild(buildVariableCard(g.tokens[ti]));
+  }
+
+  return gf;
+}
+
+function buildVariableCard(token) {
+  var hasAlpha = token.a < 0.99;
+
+  // Card: 229.6px wide, row, wrap, 12px gap, 16px padding, rgba(255,255,255,0.8), 20px radius
+  var card = figma.createFrame();
+  card.name = 'Varible';
+  card.fills = [solid(1, 1, 1, 0.8)];
+  card.cornerRadius = 20;
+  card.layoutMode = 'HORIZONTAL';
+  card.layoutWrap = 'WRAP';
+  card.itemSpacing = 12;
+  card.paddingLeft = card.paddingRight = card.paddingTop = card.paddingBottom = 16;
+  card.primaryAxisSizingMode = 'FIXED';
+  card.counterAxisSizingMode = 'AUTO';
+  card.counterAxisAlignItems = 'CENTER';
+  card.resize(229.6, 58);
+
+  // ── Swatch outer: 26×26, 4px padding, rgba(0,0,0,0.5) stroke, 4px radius ──
+  var so = figma.createFrame();
+  so.name = 'Color';
+  so.fills = [];
+  so.strokes = [{ type: 'SOLID', color: { r: 0, g: 0, b: 0, a: 0.5 } }];
+  so.strokeWeight = 1;
+  so.cornerRadius = 4;
+  so.layoutMode = 'VERTICAL';
+  so.primaryAxisAlignItems = 'SPACE_BETWEEN';
+  so.counterAxisAlignItems = 'STRETCH';
+  so.paddingLeft = so.paddingRight = so.paddingTop = so.paddingBottom = 4;
+  so.primaryAxisSizingMode = 'FIXED';
+  so.counterAxisSizingMode = 'FIXED';
+  so.resize(26, 26);
+  so.layoutAlign = 'INHERIT';
+  so.layoutGrow = 0;
   card.appendChild(so);
 
-  var si=figma.createFrame(); si.name='Color'; si.cornerRadius=1;
-  si.layoutAlign='STRETCH'; si.layoutGrow=1;
-  si.primaryAxisSizingMode='FIXED'; si.counterAxisSizingMode='FIXED';
-  try {
-    si.fills=[figma.variables.setBoundVariableForPaint(
-      solid(token.r,token.g,token.b,token.a),'color',
-      figma.variables.getVariableById(token.variableId))];
-  } catch(e) { si.fills=[solid(token.r,token.g,token.b,token.a)]; }
+  // Swatch inner: fill with variable binding + checkerboard for alpha
+  var si = figma.createFrame();
+  si.name = 'Color';
+  si.cornerRadius = 2;
+  si.layoutAlign = 'STRETCH';
+  si.layoutGrow = 1;
+  si.primaryAxisSizingMode = 'FIXED';
+  si.counterAxisSizingMode = 'FIXED';
+
+  var colorFill = solid(token.r, token.g, token.b, token.a);
+  if (hasAlpha) {
+    // Checkerboard fill underneath, then colour on top
+    var checkerFill = { type: 'SOLID', color: { r: 0.85, g: 0.85, b: 0.85 } };
+    try {
+      var boundFill = figma.variables.setBoundVariableForPaint(colorFill, 'color', figma.variables.getVariableById(token.variableId));
+      si.fills = [checkerFill, boundFill];
+    } catch(e) { si.fills = [checkerFill, colorFill]; }
+  } else {
+    try {
+      var boundFill = figma.variables.setBoundVariableForPaint(colorFill, 'color', figma.variables.getVariableById(token.variableId));
+      si.fills = [boundFill];
+    } catch(e) { si.fills = [colorFill]; }
+  }
   so.appendChild(si);
 
-  var tc=fr('text','VERTICAL',8,0,'AUTO','FIXED');
-  tc.layoutGrow=1; tc.layoutAlign='INHERIT';
-  card.appendChild(tc);
+  // ── NameHex: column, center, 8px gap, fill ──
+  var nh = figma.createFrame();
+  nh.name = 'NameHex';
+  nh.fills = [];
+  nh.layoutMode = 'VERTICAL';
+  nh.counterAxisAlignItems = 'STRETCH';
+  nh.primaryAxisAlignItems = 'CENTER';
+  nh.itemSpacing = 8;
+  nh.primaryAxisSizingMode = 'AUTO';
+  nh.counterAxisSizingMode = 'FIXED';
+  nh.layoutGrow = 1;
+  nh.layoutAlign = 'INHERIT';
+  card.appendChild(nh);
 
-  var nt=txt(token.name,16,0.1,0.1,0.1,1);
-  nt.letterSpacing={value:-2,unit:'PERCENT'};
-  nt.layoutAlign='STRETCH'; nt.textAutoResize='HEIGHT';
-  tc.appendChild(nt);
+  // Variable name
+  var nameT = makeText(token.name, 12, 0, 0, 0, 1);
+  nameT.letterSpacing = { value: -1, unit: 'PERCENT' };
+  nameT.layoutAlign = 'STRETCH';
+  nameT.textAutoResize = 'HEIGHT';
+  nh.appendChild(nameT);
 
-  var hr=fr('hex','HORIZONTAL',0,0,'FIXED','AUTO');
-  hr.primaryAxisAlignItems='SPACE_BETWEEN'; hr.layoutAlign='STRETCH';
-  tc.appendChild(hr);
+  var hex = rgbToHex(token.r, token.g, token.b);
 
-  var ht=txt('# '+rgbToHex(token.r,token.g,token.b).replace('#',''),16,0.55,0.55,0.55,1);
-  ht.letterSpacing={value:-2,unit:'PERCENT'}; ht.textAutoResize='WIDTH_AND_HEIGHT';
-  hr.appendChild(ht);
+  if (hasAlpha) {
+    // Hex + Opacity row: space-between
+    var hexRow = figma.createFrame();
+    hexRow.name = 'Hex+Opacity';
+    hexRow.fills = [];
+    hexRow.layoutMode = 'HORIZONTAL';
+    hexRow.primaryAxisAlignItems = 'SPACE_BETWEEN';
+    hexRow.itemSpacing = 8;
+    hexRow.primaryAxisSizingMode = 'FIXED';
+    hexRow.counterAxisSizingMode = 'AUTO';
+    hexRow.layoutAlign = 'STRETCH';
+    nh.appendChild(hexRow);
 
-  if (token.a<1) {
-    var at=txt(Math.round(token.a*100)+'%',16,0.55,0.55,0.55,1);
-    at.textAlignHorizontal='RIGHT'; at.textAutoResize='WIDTH_AND_HEIGHT';
-    hr.appendChild(at);
+    var hexT = makeText(hex, 12, 0, 0, 0, 0.5);
+    hexT.letterSpacing = { value: -1, unit: 'PERCENT' };
+    hexT.textAutoResize = 'WIDTH_AND_HEIGHT';
+    hexRow.appendChild(hexT);
+
+    var alphaT = makeText(Math.round(token.a * 100) + '%', 12, 0, 0, 0, 0.5);
+    alphaT.letterSpacing = { value: -1, unit: 'PERCENT' };
+    alphaT.textAlignHorizontal = 'RIGHT';
+    alphaT.textAutoResize = 'WIDTH_AND_HEIGHT';
+    hexRow.appendChild(alphaT);
+  } else {
+    // Just hex
+    var hexT2 = makeText(hex, 12, 0, 0, 0, 0.5);
+    hexT2.letterSpacing = { value: -1, unit: 'PERCENT' };
+    hexT2.textAutoResize = 'WIDTH_AND_HEIGHT';
+    nh.appendChild(hexT2);
   }
+
   return card;
-}
-
-function buildThemes(outer, col) {
-  var modes=col.modes;
-  var t=txt(col.name,64,0,0,0,1);
-  t.letterSpacing={value:-1,unit:'PERCENT'};
-  t.layoutAlign='STRETCH'; t.textAutoResize='HEIGHT';
-  outer.appendChild(t);
-
-  var tc=fr('themes','VERTICAL',40,0,'AUTO','FIXED');
-  tc.layoutAlign='STRETCH'; outer.appendChild(tc);
-
-  // Headers
-  var hdr=fr('headers','HORIZONTAL',20,0,'FIXED','AUTO');
-  hdr.resize(1840,40); hdr.layoutAlign='STRETCH';
-  tc.appendChild(hdr);
-
-  var sh=txt('Semantic',32,0.35,0.35,0.35,1);
-  sh.resize(445,36); sh.textAutoResize='HEIGHT';
-  sh.layoutAlign='INHERIT'; sh.layoutGrow=0;
-  hdr.appendChild(sh);
-
-  for (var mi=0; mi<modes.length; mi++) {
-    var mh=txt(modes[mi].name,32,0.35,0.35,0.35,1);
-    mh.textAutoResize='WIDTH_AND_HEIGHT';
-    mh.layoutAlign='INHERIT'; mh.layoutGrow=1;
-    hdr.appendChild(mh);
-  }
-
-  var rc=fr('rows','VERTICAL',20,0,'AUTO','FIXED');
-  rc.layoutAlign='STRETCH'; tc.appendChild(rc);
-
-  for (var i=0; i<col.variableIds.length; i++) {
-    var variable=figma.variables.getVariableById(col.variableIds[i]);
-    if (!variable||variable.resolvedType!=='COLOR') continue;
-
-    var tokenName='--'+variable.name.replace(/\//g,'-').toLowerCase();
-    var row=fr(variable.name,'HORIZONTAL',20,0,'FIXED','FIXED');
-    row.resize(1840,76); row.counterAxisAlignItems='CENTER';
-    row.layoutAlign='STRETCH'; rc.appendChild(row);
-
-    // Semantic card
-    var sc=figma.createFrame(); sc.name='semantic';
-    sc.fills=[solid(1,1,1,1)]; sc.cornerRadius=8;
-    sc.layoutMode='HORIZONTAL'; sc.itemSpacing=20;
-    sc.paddingLeft=sc.paddingRight=sc.paddingTop=sc.paddingBottom=20;
-    sc.primaryAxisSizingMode='FIXED'; sc.counterAxisSizingMode='FIXED';
-    sc.counterAxisAlignItems='CENTER'; sc.resize(445,76);
-    sc.layoutAlign='INHERIT'; sc.layoutGrow=0;
-    row.appendChild(sc);
-
-    var snt=txt(tokenName,24,0,0,0,1);
-    snt.letterSpacing={value:-2,unit:'PERCENT'};
-    snt.layoutAlign='INHERIT'; snt.layoutGrow=1; snt.textAutoResize='HEIGHT';
-    sc.appendChild(snt);
-
-    // Mode cards
-    for (var mi2=0; mi2<modes.length; mi2++) {
-      var mode=modes[mi2];
-      // Try this mode's ID, then default, then first available
-      var raw=variable.valuesByMode[mode.modeId];
-      if (!raw) { var keys3=Object.keys(variable.valuesByMode); if(keys3.length) raw=variable.valuesByMode[keys3[0]]; }
-      if (!raw) raw=variable.valuesByMode[Object.keys(variable.valuesByMode)[0]];
-      var res=raw ? resolveColor(raw, mode.modeId) : null;
-
-      var mc=figma.createFrame(); mc.name=mode.name;
-      mc.fills=[solid(1,1,1,1)]; mc.cornerRadius=8;
-      mc.layoutMode='HORIZONTAL'; mc.itemSpacing=16;
-      mc.paddingLeft=mc.paddingRight=mc.paddingTop=mc.paddingBottom=16;
-      mc.primaryAxisSizingMode='FIXED'; mc.counterAxisSizingMode='FIXED';
-      mc.counterAxisAlignItems='CENTER';
-      mc.layoutAlign='INHERIT'; mc.layoutGrow=1;
-      row.appendChild(mc);
-
-      if (!res) {
-        var dT=txt('—',16,0.6,0.6,0.6,1);
-        dT.textAutoResize='WIDTH_AND_HEIGHT';
-        mc.appendChild(dT); continue;
-      }
-
-      var so2=figma.createFrame(); so2.name='Color'; so2.fills=[];
-      so2.strokes=[{type:'SOLID',color:{r:0,g:0,b:0}}]; so2.strokeWeight=1;
-      so2.cornerRadius=2.4; so2.layoutMode='VERTICAL';
-      so2.paddingLeft=so2.paddingRight=so2.paddingTop=so2.paddingBottom=2.4;
-      so2.primaryAxisSizingMode='FIXED'; so2.counterAxisSizingMode='FIXED';
-      so2.resize(44,44); so2.layoutAlign='INHERIT'; so2.layoutGrow=0;
-      mc.appendChild(so2);
-
-      var si2=figma.createFrame(); si2.name='Color'; si2.cornerRadius=1;
-      si2.layoutAlign='STRETCH'; si2.layoutGrow=1;
-      si2.primaryAxisSizingMode='FIXED'; si2.counterAxisSizingMode='FIXED';
-      try {
-        si2.fills=[figma.variables.setBoundVariableForPaint(
-          solid(res.rgba.r,res.rgba.g,res.rgba.b,res.rgba.a||1),
-          'color',figma.variables.getVariableById(variable.id))];
-      } catch(e) { si2.fills=[solid(res.rgba.r,res.rgba.g,res.rgba.b,res.rgba.a||1)]; }
-      so2.appendChild(si2);
-
-      var pn=res.aliasName?'--'+res.aliasName.replace(/\//g,'-').toLowerCase():rgbToHex(res.rgba.r,res.rgba.g,res.rgba.b);
-      var pt=txt(pn,16,0.1,0.1,0.1,1);
-      pt.letterSpacing={value:-2,unit:'PERCENT'};
-      pt.layoutAlign='INHERIT'; pt.layoutGrow=1; pt.textAutoResize='HEIGHT';
-      mc.appendChild(pt);
-    }
-  }
 }
