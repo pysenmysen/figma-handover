@@ -725,7 +725,7 @@ function buildStyleGradientCard(item) {
   card.counterAxisAlignItems = 'CENTER';
   card.primaryAxisSizingMode = 'FIXED';
   card.counterAxisSizingMode = 'AUTO';
-  // Fill available width — will be set by parent wrap
+  card.resize(267, 100); // width set — height will hug
   card.layoutAlign = 'INHERIT';
 
   // Swatch outer: 52×52, 4px pad, rgba(0,0,0,0.5) stroke
@@ -822,6 +822,7 @@ function buildStyleEffectCard(item) {
   card.counterAxisAlignItems = 'CENTER';
   card.primaryAxisSizingMode = 'FIXED';
   card.counterAxisSizingMode = 'AUTO';
+  card.resize(267, 100);
   card.layoutAlign = 'INHERIT';
 
   // Preview circle
