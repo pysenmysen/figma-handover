@@ -351,3 +351,211 @@ function buildCard(token) {
 
   return card;
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// THEMES — multi-mode collections
+// Layout: semantic col | mode1 col | mode2 col | ...
+// ══════════════════════════════════════════════════════════════════════════════
+function buildThemes(outer, col) {
+  var modes = col.modes;
+  var modeId = col.defaultModeId;
+
+  // Collect all tokens grouped by path prefix (top 2 segments)
+  var groups = {}, groupOrder = [];
+  for (var i = 0; i < col.variableIds.length; i++) {
+    var v = figma.variables.getVariableById(col.variableIds[i]);
+    if (!v || v.resolvedType !== 'COLOR') continue;
+    var parts = v.name.split('/');
+    var gKey = parts.length > 1 ? parts.slice(0,2).join('/') : '__root__';
+    if (!groups[gKey]) { groups[gKey] = { tokens: [] }; groupOrder.push(gKey); }
+    groups[gKey].tokens.push(v);
+  }
+
+  // Outer themes row: fill, horizontal, 4px gap
+  var row = figma.createFrame();
+  row.name = col.name;
+  row.fills = [];
+  row.clipsContent = false;
+  row.layoutMode = 'HORIZONTAL';
+  row.itemSpacing = 4;
+  row.primaryAxisSizingMode = 'FIXED';
+  row.counterAxisSizingMode = 'AUTO';
+  row.layoutAlign = 'STRETCH';
+  outer.appendChild(row);
+
+  // Build one column per mode + semantic column
+  // Cols: [semantic] [mode0] [mode1] ...
+  var numCols = modes.length + 1;
+
+  // ── Semantic column ──────────────────────────────────────────────────────
+  var semCol = figma.createFrame();
+  semCol.name = 'Semantic';
+  semCol.fills = [];
+  semCol.layoutMode = 'VERTICAL';
+  semCol.itemSpacing = 4;
+  semCol.primaryAxisSizingMode = 'AUTO';
+  semCol.counterAxisSizingMode = 'FIXED';
+  semCol.layoutGrow = 1;
+  semCol.layoutAlign = 'INHERIT';
+  row.appendChild(semCol);
+
+  // Semantic header
+  buildThemeHeader(semCol, 'Semantic');
+
+  // Semantic rows grouped with separators
+  for (var gi = 0; gi < groupOrder.length; gi++) {
+    if (gi > 0) buildSeparator(semCol);
+    var g = groups[groupOrder[gi]];
+    for (var ti = 0; ti < g.tokens.length; ti++) {
+      var v = g.tokens[ti];
+      var parts = v.name.split('/');
+      var cssName = '--' + v.name.replace(/\//g,'-').toLowerCase();
+      var rowCard = buildThemeNameCard(cssName, ti % 2 === 0);
+      semCol.appendChild(rowCard);
+    }
+  }
+
+  // ── One column per mode ──────────────────────────────────────────────────
+  for (var mi = 0; mi < modes.length; mi++) {
+    var mode = modes[mi];
+    var modeCol = figma.createFrame();
+    modeCol.name = mode.name;
+    modeCol.fills = [];
+    modeCol.layoutMode = 'VERTICAL';
+    modeCol.itemSpacing = 4;
+    modeCol.primaryAxisSizingMode = 'AUTO';
+    modeCol.counterAxisSizingMode = 'FIXED';
+    modeCol.layoutGrow = 1;
+    modeCol.layoutAlign = 'INHERIT';
+    row.appendChild(modeCol);
+
+    buildThemeHeader(modeCol, mode.name);
+
+    for (var gi2 = 0; gi2 < groupOrder.length; gi2++) {
+      if (gi2 > 0) buildSeparator(modeCol);
+      var g2 = groups[groupOrder[gi2]];
+      for (var ti2 = 0; ti2 < g2.tokens.length; ti2++) {
+        var v2 = g2.tokens[ti2];
+        var raw = v2.valuesByMode[mode.modeId];
+        if (!raw) { var ks = Object.keys(v2.valuesByMode); if(ks.length) raw = v2.valuesByMode[ks[0]]; }
+        var res = raw ? resolveColor(raw, mode.modeId) : null;
+        var modeCard = buildThemeModeCard(v2, res, ti2 % 2 === 0);
+        modeCol.appendChild(modeCard);
+      }
+    }
+  }
+}
+
+function buildThemeHeader(parent, label) {
+  var hdr = figma.createFrame();
+  hdr.name = 'ThemeHeader';
+  hdr.fills = [];
+  hdr.layoutMode = 'HORIZONTAL';
+  hdr.counterAxisAlignItems = 'CENTER';
+  hdr.itemSpacing = 4;
+  hdr.paddingBottom = 16;
+  hdr.primaryAxisSizingMode = 'FIXED';
+  hdr.counterAxisSizingMode = 'AUTO';
+  hdr.layoutAlign = 'STRETCH';
+  parent.appendChild(hdr);
+
+  var t = makeText(label, 12, 0, 0, 0, 0.5);
+  t.textAutoResize = 'WIDTH_AND_HEIGHT';
+  hdr.appendChild(t);
+}
+
+function buildSeparator(parent) {
+  var sep = figma.createFrame();
+  sep.name = 'Seperator';
+  sep.fills = [];
+  sep.layoutMode = 'HORIZONTAL';
+  sep.counterAxisAlignItems = 'CENTER';
+  sep.itemSpacing = 4;
+  sep.paddingBottom = 12;
+  sep.primaryAxisSizingMode = 'FIXED';
+  sep.counterAxisSizingMode = 'AUTO';
+  sep.resize(10, 28);
+  sep.layoutAlign = 'STRETCH';
+  parent.appendChild(sep);
+}
+
+// Semantic name card — token name only, no swatch
+function buildThemeNameCard(cssName, primary) {
+  var card = figma.createFrame();
+  card.name = 'Colou';
+  card.fills = [{ type: 'SOLID', color: { r:1, g:1, b:1 }, opacity: primary ? 0.8 : 0.3 }];
+  card.cornerRadius = 20;
+  card.layoutMode = 'HORIZONTAL';
+  card.layoutWrap = 'WRAP';
+  card.itemSpacing = 12;
+  card.paddingLeft = card.paddingRight = 16;
+  card.paddingTop = card.paddingBottom = 12;
+  card.primaryAxisSizingMode = 'FIXED';
+  card.counterAxisSizingMode = 'AUTO';
+  card.counterAxisAlignItems = 'CENTER';
+  card.layoutAlign = 'STRETCH';
+
+  var t = makeText(cssName, 12, 0, 0, 0, 1);
+  t.textAutoResize = 'WIDTH_AND_HEIGHT';
+  card.appendChild(t);
+
+  return card;
+}
+
+// Mode card — swatch + primitive name
+function buildThemeModeCard(variable, res, primary) {
+  var card = figma.createFrame();
+  card.name = 'Colou';
+  card.fills = [{ type: 'SOLID', color: { r:1, g:1, b:1 }, opacity: primary ? 0.8 : 0.3 }];
+  card.cornerRadius = 20;
+  card.layoutMode = 'HORIZONTAL';
+  card.itemSpacing = 12;
+  card.paddingLeft = card.paddingRight = 16;
+  card.paddingTop = card.paddingBottom = 12;
+  card.primaryAxisSizingMode = 'FIXED';
+  card.counterAxisSizingMode = 'AUTO';
+  card.counterAxisAlignItems = 'CENTER';
+  card.layoutAlign = 'STRETCH';
+
+  if (!res) {
+    var dash = makeText('—', 12, 0, 0, 0, 0.4);
+    dash.textAutoResize = 'WIDTH_AND_HEIGHT';
+    card.appendChild(dash);
+    return card;
+  }
+
+  // Swatch 26×26
+  var so = figma.createFrame();
+  so.name = 'Color'; so.fills = [];
+  so.layoutMode = 'NONE';
+  so.strokes = [{ type: 'SOLID', color: { r:0, g:0, b:0 }, opacity: 0.5 }];
+  so.strokeWeight = 1; so.cornerRadius = 4;
+  so.resize(26, 26);
+  so.layoutAlign = 'INHERIT'; so.layoutGrow = 0;
+  card.appendChild(so);
+
+  var si = figma.createRectangle();
+  si.name = 'Color'; si.cornerRadius = 2;
+  si.resize(18, 18); si.x = 4; si.y = 4;
+  var hasAlpha = res.rgba.a < 0.99;
+  var colorFill = { type: 'SOLID', color: { r: res.rgba.r, g: res.rgba.g, b: res.rgba.b }, opacity: res.rgba.a };
+  try {
+    var bf = figma.variables.setBoundVariableForPaint(colorFill, 'color', figma.variables.getVariableById(variable.id));
+    si.fills = hasAlpha ? [{ type: 'SOLID', color: { r:0.85, g:0.85, b:0.85 } }, bf] : [bf];
+  } catch(e) {
+    si.fills = hasAlpha ? [{ type: 'SOLID', color: { r:0.85, g:0.85, b:0.85 } }, colorFill] : [colorFill];
+  }
+  so.appendChild(si);
+
+  // Primitive name
+  var primName = res.aliasName
+    ? '--' + res.aliasName.replace(/\//g,'-').toLowerCase()
+    : toHex(res.rgba.r, res.rgba.g, res.rgba.b);
+  var pt = makeText(primName, 12, 0, 0, 0, 0.7);
+  pt.layoutGrow = 1;
+  pt.textAutoResize = 'HEIGHT';
+  pt.layoutAlign = 'INHERIT';
+  card.appendChild(pt);
+
+  return card;
+}
