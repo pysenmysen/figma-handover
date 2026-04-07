@@ -761,11 +761,11 @@ function buildStyleGradientCard(item) {
   gradRect.layoutMode = 'NONE';
   gradRect.cornerRadius = 2;
   gradRect.resize(44, 44);
-  gradRect.layoutPositioning = 'ABSOLUTE';
-  gradRect.x = 4; gradRect.y = 4;
   try { gradRect.fills = item.style.paints; }
   catch(e) { gradRect.fills = [{ type: 'SOLID', color: { r:0.8, g:0.8, b:0.8 } }]; }
-  so.appendChild(gradRect);
+  so.appendChild(gradRect); // append first, then set absolute
+  gradRect.layoutPositioning = 'ABSOLUTE';
+  gradRect.x = 4; gradRect.y = 4;
 
   // NameHex: column, center, stretch, 8px gap, fill width
   var nh = figma.createFrame();
