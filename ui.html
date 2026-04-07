@@ -243,6 +243,7 @@ function startBuild() {
 window.onmessage = function(e) {
   var msg = e.data.pluginMessage;
   if (!msg) return;
+  if (msg.type === 'error') { show('s-import'); document.getElementById('footer-note').textContent = 'Error: ' + msg.message; }
   if (msg.type === 'done') {
     document.getElementById('done-sub').textContent =
       parsedGroups.length + ' group' + (parsedGroups.length !== 1 ? 's' : '') + ' drawn on the canvas.';
