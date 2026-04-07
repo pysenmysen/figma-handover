@@ -725,8 +725,9 @@ function buildStyleGradientCard(item) {
   card.paddingLeft = card.paddingRight = card.paddingTop = card.paddingBottom = 16;
   card.counterAxisAlignItems = 'CENTER';
   card.primaryAxisSizingMode = 'FIXED';
-  card.counterAxisSizingMode = 'AUTO';
-  card.resize(288, 52);
+  card.counterAxisSizingMode = 'AUTO'; // hug height
+  card.clipsContent = false;
+  card.resize(288, 84); // height will expand to fit content
 
   // Swatch outer: 52×52, COLUMN layout, 4px padding, rgba(0,0,0,0.5) stroke, 4px radius
   var so = figma.createFrame();
@@ -825,8 +826,9 @@ function buildStyleEffectCard(item) {
   card.paddingLeft = card.paddingRight = card.paddingTop = card.paddingBottom = 16;
   card.counterAxisAlignItems = 'CENTER';
   card.primaryAxisSizingMode = 'FIXED';
-  card.counterAxisSizingMode = 'AUTO';
-  card.resize(288, 52);
+  card.counterAxisSizingMode = 'AUTO'; // hug height
+  card.clipsContent = false;
+  card.resize(288, 84); // height will expand to fit content
   card.layoutAlign = 'INHERIT';
 
   // Preview circle
