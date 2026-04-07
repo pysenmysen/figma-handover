@@ -160,6 +160,7 @@
 var collections = [];
 var selected = {};
 var stylesSelected = false;
+var typographySelected = false;
 
 window.onmessage = function(e) {
   var msg = e.data.pluginMessage;
@@ -170,7 +171,8 @@ window.onmessage = function(e) {
     if (!collections.length && !msg.hasStyles) { show('s-empty'); return; }
     collections.forEach(function(c) { selected[c.id] = true; });
     stylesSelected = msg.hasStyles || false;
-    renderList(msg.hasStyles, msg.styleCount);
+    typographySelected = msg.hasTypography || false;
+    renderList(msg.hasStyles, msg.styleCount, msg.hasTypography, msg.typographyCount);
     if (msg.hasExisting && msg.existingNames && msg.existingNames.length) {
       document.getElementById('btn-build').textContent = 'Update frames';
       document.getElementById('btn-build').classList.add('btn-update');
@@ -208,7 +210,7 @@ window.onmessage = function(e) {
   }
 };
 
-function renderList(hasStyles, styleCount) {
+function renderList(hasStyles, styleCount, hasTypography, typographyCount) {
   var list = document.getElementById('col-list');
   list.innerHTML = '';
   collections.forEach(function(col) {
@@ -236,6 +238,21 @@ function renderList(hasStyles, styleCount) {
     };
     list.appendChild(styleCard);
   }
+  // Add Typography card
+  if (hasTypography) {
+    var typeCard = document.createElement('div');
+    typeCard.className = 'col-card' + (typographySelected ? ' selected' : '');
+    typeCard.id = 'type-card';
+    typeCard.innerHTML = '<div class="col-check"><div class="col-check-inner"></div></div>'
+      + '<div class="col-info"><div class="col-name">Typography</div>'
+      + '<div class="col-meta">' + (typographyCount || 0) + ' text styles</div></div>';
+    typeCard.onclick = function() {
+      typographySelected = !typographySelected;
+      typeCard.classList.toggle('selected', typographySelected);
+      updateCount();
+    };
+    list.appendChild(typeCard);
+  }
   updateCount();
 }
 
@@ -257,6 +274,7 @@ function toggleAll() {
 function updateCount() {
   var n = collections.filter(function(c) { return selected[c.id]; }).length;
   if (stylesSelected) n++;
+  if (typographySelected) n++;
   document.getElementById('count').textContent = n;
   document.getElementById('btn-build').disabled = n === 0;
 }
@@ -269,9 +287,10 @@ function startBuild() {
     return '<div class="prog-step"><div class="step-dot"></div><span>' + esc(col ? col.name : id) + '</span></div>';
   });
   if (stylesSelected) stepItems.push('<div class="prog-step"><div class="step-dot"></div><span>Effects &amp; Gradients</span></div>');
+  if (typographySelected) stepItems.push('<div class="prog-step"><div class="step-dot"></div><span>Typography</span></div>');
   steps.innerHTML = stepItems.join('');
   show('s-progress');
-  parent.postMessage({ pluginMessage: { type: 'build', collectionIds: ids, buildStyles: stylesSelected } }, '*');
+  parent.postMessage({ pluginMessage: { type: 'build', collectionIds: ids, buildStyles: stylesSelected, buildTypography: typographySelected } }, '*');
 }
 
 function showPick() { show('s-pick'); }

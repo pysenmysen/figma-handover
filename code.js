@@ -22,7 +22,10 @@ figma.showUI(__html__, { width: 480, height: 560, themeColors: true });
   var gradientCount = paintStyles.filter(function(s) {
     return s.paints && s.paints.some(function(p) { return p.type.indexOf('GRADIENT') !== -1; });
   }).length;
+  var textStyles = figma.getLocalTextStyles ? figma.getLocalTextStyles() : [];
   var hasStyles = (effectStyles.length + gradientCount) > 0;
+  var hasTypography = textStyles.length > 0;
+  var typographyCount = textStyles.length;
   var styleCount = effectStyles.length + gradientCount;
 
   // Check if any frames already exist on current page
@@ -32,7 +35,7 @@ figma.showUI(__html__, { width: 480, height: 560, themeColors: true });
   var hasExisting = existingFrames.length > 0;
   var existingNames = existingFrames.map(function(f) { return f.name; });
 
-  figma.ui.postMessage({ type: 'collections', data: summary, version: VERSION, hasExisting: hasExisting, existingNames: existingNames, hasStyles: hasStyles, styleCount: styleCount });
+  figma.ui.postMessage({ type: 'collections', data: summary, version: VERSION, hasExisting: hasExisting, existingNames: existingNames, hasStyles: hasStyles, styleCount: styleCount, hasTypography: hasTypography, typographyCount: typographyCount });
 })();
 
 figma.ui.onmessage = async function(msg) {
@@ -75,6 +78,10 @@ figma.ui.onmessage = async function(msg) {
     }
     if (msg.buildStyles) {
       try { buildStylesFrame(); }
+      catch(err) { figma.ui.postMessage({ type: 'error', message: String(err) }); return; }
+    }
+    if (msg.buildTypography) {
+      try { buildTypography(); }
       catch(err) { figma.ui.postMessage({ type: 'error', message: String(err) }); return; }
     }
     figma.ui.postMessage({ type: 'done' });
@@ -911,4 +918,237 @@ function effectToCss(effects) {
     }
   }
   return parts.join(', ');
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TYPOGRAPHY — local text styles grouped by path prefix
+// ══════════════════════════════════════════════════════════════════════════════
+function buildTypography() {
+  // Remove existing
+  figma.currentPage.findAll(function(n) {
+    return n.type === 'FRAME' && n.name === 'Typography';
+  }).forEach(function(f) { f.remove(); });
+
+  var textStyles = figma.getLocalTextStyles();
+  if (!textStyles.length) return;
+
+  // Group by first path segment
+  var groups = {}, groupOrder = [];
+  for (var i = 0; i < textStyles.length; i++) {
+    var s = textStyles[i];
+    var parts = s.name.split('/');
+    var gKey = parts[0];
+    if (!groups[gKey]) { groups[gKey] = { styles: [] }; groupOrder.push(gKey); }
+    groups[gKey].styles.push(s);
+  }
+
+  // Outer: column, 16px gap, 1164px fixed
+  var outer = figma.createFrame();
+  outer.name = 'Typography';
+  outer.fills = [];
+  outer.clipsContent = false;
+  outer.layoutMode = 'VERTICAL';
+  outer.itemSpacing = 16;
+  outer.primaryAxisSizingMode = 'AUTO';
+  outer.counterAxisSizingMode = 'FIXED';
+  outer.resize(FRAME_W, 100);
+
+  for (var gi = 0; gi < groupOrder.length; gi++) {
+    var gKey = groupOrder[gi];
+    var g = groups[gKey];
+
+    // Section row: doc panel + styles column
+    var secRow = figma.createFrame();
+    secRow.name = gKey;
+    secRow.fills = [];
+    secRow.layoutMode = 'HORIZONTAL';
+    secRow.itemSpacing = 16;
+    secRow.primaryAxisSizingMode = 'FIXED';
+    secRow.counterAxisSizingMode = 'AUTO';
+    secRow.layoutAlign = 'STRETCH';
+    outer.appendChild(secRow);
+
+    // ── Doc panel (320px, #272727) ────────────────────────────────────────
+    var doc = figma.createFrame();
+    doc.name = 'Doc';
+    doc.fills = [{ type: 'SOLID', color: { r:0.153, g:0.153, b:0.153 } }];
+    doc.cornerRadius = 20;
+    doc.effects = [{ type:'INNER_SHADOW', color:{r:1,g:1,b:1,a:0.05}, offset:{x:0,y:0}, radius:4, spread:1, visible:true, blendMode:'NORMAL' }];
+    doc.layoutMode = 'VERTICAL';
+    doc.itemSpacing = 0;
+    doc.paddingLeft = doc.paddingRight = doc.paddingTop = doc.paddingBottom = 16;
+    doc.primaryAxisSizingMode = 'AUTO';
+    doc.counterAxisSizingMode = 'FIXED';
+    doc.resize(320, 100);
+    doc.layoutAlign = 'STRETCH';
+    secRow.appendChild(doc);
+
+    // Header: "Typography" (70% white) + group name (white)
+    var hdr = figma.createFrame();
+    hdr.name = 'Header'; hdr.fills = [];
+    hdr.layoutMode = 'VERTICAL'; hdr.itemSpacing = 0;
+    hdr.paddingBottom = 16;
+    hdr.primaryAxisSizingMode = 'AUTO';
+    hdr.counterAxisSizingMode = 'FIXED'; hdr.layoutAlign = 'STRETCH';
+    doc.appendChild(hdr);
+
+    var epicT = makeText('Typography', 16, 1, 1, 1, 0.7);
+    epicT.layoutAlign = 'STRETCH'; epicT.textAutoResize = 'HEIGHT';
+    hdr.appendChild(epicT);
+
+    var instT = makeText(gKey, 16, 1, 1, 1, 1);
+    instT.layoutAlign = 'STRETCH'; instT.textAutoResize = 'HEIGHT';
+    hdr.appendChild(instT);
+
+    // Options: font family row
+    var opts = figma.createFrame();
+    opts.name = 'Options'; opts.fills = [];
+    opts.strokes = [{ type:'SOLID', color:{r:1,g:1,b:1}, opacity:0.2 }];
+    opts.strokeWeight = 0.5; opts.strokeTopWeight = 0.5;
+    opts.strokeBottomWeight = 0; opts.strokeLeftWeight = 0; opts.strokeRightWeight = 0;
+    opts.layoutMode = 'VERTICAL'; opts.itemSpacing = 2;
+    opts.paddingTop = opts.paddingBottom = 12;
+    opts.primaryAxisSizingMode = 'AUTO';
+    opts.counterAxisSizingMode = 'FIXED'; opts.layoutAlign = 'STRETCH';
+    doc.appendChild(opts);
+
+    // Get font family from first style in group
+    var fontFamily = g.styles[0].fontName ? g.styles[0].fontName.family : '—';
+
+    buildDocRow(opts, 'Font family', fontFamily);
+    buildDocRow(opts, 'Text transform', 'Regular + Italic');
+
+    // ── TextStyles column (fill) ──────────────────────────────────────────
+    var stylesCol = figma.createFrame();
+    stylesCol.name = 'TextStyles'; stylesCol.fills = [];
+    stylesCol.layoutMode = 'VERTICAL'; stylesCol.itemSpacing = 16;
+    stylesCol.primaryAxisSizingMode = 'AUTO';
+    stylesCol.counterAxisSizingMode = 'FIXED';
+    stylesCol.layoutGrow = 1; stylesCol.layoutAlign = 'INHERIT';
+    secRow.appendChild(stylesCol);
+
+    for (var si = 0; si < g.styles.length; si++) {
+      stylesCol.appendChild(buildTypographyCard(g.styles[si], gKey));
+    }
+  }
+
+  figma.currentPage.appendChild(outer);
+  figma.viewport.scrollAndZoomIntoView([outer]);
+}
+
+function buildDocRow(parent, label, value) {
+  var row = figma.createFrame();
+  row.name = 'DataRow'; row.fills = [{ type:'SOLID', color:{r:1,g:1,b:1}, opacity:0.05 }];
+  row.cornerRadius = 4;
+  row.layoutMode = 'HORIZONTAL';
+  row.paddingLeft = row.paddingTop = row.paddingBottom = 4;
+  row.paddingRight = 16;
+  row.primaryAxisSizingMode = 'FIXED';
+  row.counterAxisSizingMode = 'AUTO';
+  row.layoutAlign = 'STRETCH';
+  parent.appendChild(row);
+
+  var labelT = makeText(label, 10, 1, 1, 1, 0.7);
+  labelT.textAutoResize = 'HEIGHT';
+  labelT.resize(68, 16);
+  row.appendChild(labelT);
+
+  var valT = makeText(value, 10, 1, 1, 1, 1);
+  valT.layoutGrow = 1; valT.layoutAlign = 'STRETCH'; valT.textAutoResize = 'HEIGHT';
+  row.appendChild(valT);
+}
+
+function buildTypographyCard(style, group) {
+  // Card: fill width, row, 16px gap, 16px padding, rgba(255,255,255,0.8), 20px radius
+  var card = figma.createFrame();
+  card.name = style.name;
+  card.fills = [{ type:'SOLID', color:{r:1,g:1,b:1}, opacity:0.8 }];
+  card.strokes = [{ type:'SOLID', color:{r:1,g:1,b:1}, opacity:0.8 }];
+  card.strokeWeight = 1;
+  card.cornerRadius = 20;
+  card.effects = [{ type:'INNER_SHADOW', color:{r:0,g:0,b:0,a:0.05}, offset:{x:0,y:0}, radius:4, spread:1, visible:true, blendMode:'NORMAL' }];
+  card.layoutMode = 'HORIZONTAL';
+  card.itemSpacing = 16;
+  card.paddingLeft = card.paddingRight = card.paddingTop = card.paddingBottom = 16;
+  card.counterAxisAlignItems = 'CENTER';
+  card.primaryAxisSizingMode = 'FIXED';
+  card.counterAxisSizingMode = 'AUTO';
+  card.layoutAlign = 'STRETCH';
+
+  // StyleSettings: 288px fixed, row wrap, 2px gap — 4 data pills
+  var settings = figma.createFrame();
+  settings.name = 'StyleSettings'; settings.fills = [];
+  settings.layoutMode = 'HORIZONTAL'; settings.layoutWrap = 'WRAP';
+  settings.itemSpacing = 2; settings.counterAxisSpacing = 2;
+  settings.primaryAxisSizingMode = 'FIXED'; settings.counterAxisSizingMode = 'AUTO';
+  settings.resize(288, 10);
+  card.appendChild(settings);
+
+  // 4 spec pills
+  var fs = Math.round(style.fontSize) + 'px';
+  var lh = style.lineHeight && style.lineHeight.unit === 'PERCENT'
+    ? Math.round(style.lineHeight.value) + '%'
+    : style.lineHeight && style.lineHeight.unit === 'PIXELS'
+    ? Math.round(style.lineHeight.value) + 'px' : '—';
+  var wt = style.fontName ? style.fontName.style : 'Regular';
+  var ls = style.letterSpacing && style.letterSpacing.unit === 'PERCENT'
+    ? Math.round(style.letterSpacing.value) + '%'
+    : style.letterSpacing && style.letterSpacing.unit === 'PIXELS'
+    ? style.letterSpacing.value + 'px' : '0';
+
+  buildSpecPill(settings, 'Font-size', fs);
+  buildSpecPill(settings, 'Line-height', lh);
+  buildSpecPill(settings, 'Weight', wt);
+  buildSpecPill(settings, 'Letter-spacing', ls);
+
+  // TextStyle preview: fill, text with style applied
+  var preview = figma.createText();
+  preview.name = 'TextStyle';
+  preview.layoutAlign = 'INHERIT'; preview.layoutGrow = 1;
+  preview.textAutoResize = 'HEIGHT';
+
+  // Sample text based on font size
+  var sample = style.fontSize >= 20
+    ? 'Primary\nSecond line'
+    : group.toLowerCase().includes('misc') || style.fontSize <= 16
+    ? 'Button text'
+    : 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.';
+
+  // Try applying the text style
+  try {
+    // Load the font first
+    var fontName = style.fontName || { family: 'Inter', style: 'Regular' };
+    preview.fontName = { family: fontName.family, style: fontName.style };
+  } catch(e) {
+    try { preview.fontName = { family: 'Inter', style: 'Regular' }; } catch(e2) {}
+  }
+  preview.characters = sample;
+  try { preview.textStyleId = style.id; } catch(e) {
+    preview.fontSize = style.fontSize;
+  }
+  preview.fills = [{ type:'SOLID', color:{r:0,g:0,b:0} }];
+  card.appendChild(preview);
+
+  return card;
+}
+
+function buildSpecPill(parent, label, value) {
+  // Pill: 143px fixed, row, 4px gap, 4px padding, rgba(0,0,0,0.05), 4px radius
+  var pill = figma.createFrame();
+  pill.name = label; pill.fills = [{ type:'SOLID', color:{r:0,g:0,b:0}, opacity:0.05 }];
+  pill.cornerRadius = 4;
+  pill.layoutMode = 'HORIZONTAL'; pill.itemSpacing = 4;
+  pill.paddingLeft = pill.paddingRight = pill.paddingTop = pill.paddingBottom = 4;
+  pill.primaryAxisSizingMode = 'FIXED'; pill.counterAxisSizingMode = 'AUTO';
+  pill.resize(143, 10);
+  parent.appendChild(pill);
+
+  var lT = makeText(label, 10, 0, 0, 0, 0.5);
+  lT.textAutoResize = 'WIDTH_AND_HEIGHT';
+  pill.appendChild(lT);
+
+  var vT = makeText(value, 10, 0, 0, 0, 1);
+  vT.fontWeight = 700;
+  vT.textAutoResize = 'WIDTH_AND_HEIGHT';
+  pill.appendChild(vT);
 }
