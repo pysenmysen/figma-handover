@@ -733,7 +733,7 @@ function buildStyleGradientCard(item) {
   so.name = 'Color';
   so.layoutMode = 'VERTICAL';
   so.primaryAxisAlignItems = 'SPACE_BETWEEN';
-  so.counterAxisAlignItems = 'STRETCH';
+  // so.counterAxisAlignItems — MIN is default, no STRETCH needed
   so.paddingLeft = so.paddingRight = so.paddingTop = so.paddingBottom = 4;
   so.itemSpacing = 6;
   so.fills = [];
