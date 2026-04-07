@@ -234,7 +234,6 @@ function buildCard(token) {
 
   // NameHex column: vertical, 6px gap, grows to fill
   var nh = F('NameHex', 'VERTICAL', 6);
-  nh.counterAxisAlignItems = 'STRETCH';
   nh.primaryAxisAlignItems = 'CENTER';
   nh.layoutGrow = 1; nh.layoutAlign = 'STRETCH';
   card.appendChild(nh);
