@@ -782,7 +782,7 @@ function buildStyleGradientCard(item) {
   // GradientName: column, stretch, 4px gap
   var gn = figma.createFrame();
   gn.name = 'GradientName'; gn.fills = [];
-  gn.layoutMode = 'VERTICAL'; gn.itemSpacing = 4;
+  gn.layoutMode = 'VERTICAL'; gn.itemSpacing = 0;
   gn.primaryAxisSizingMode = 'AUTO';
   gn.counterAxisSizingMode = 'FIXED';
   gn.layoutAlign = 'STRETCH';
