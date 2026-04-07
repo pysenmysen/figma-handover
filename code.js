@@ -16,6 +16,15 @@ figma.showUI(__html__, { width: 480, height: 560, themeColors: true });
     return { id: col.id, name: col.name, colorCount: colorCount,
       modes: col.modes.map(function(m) { return { id: m.modeId, name: m.name }; }) };
   }).filter(function(c) { return c.colorCount > 0; });
+  // Count styles
+  var effectStyles = figma.variables ? figma.getLocalEffectStyles() : [];
+  var paintStyles = figma.getLocalPaintStyles ? figma.getLocalPaintStyles() : [];
+  var gradientCount = paintStyles.filter(function(s) {
+    return s.paints && s.paints.some(function(p) { return p.type.indexOf('GRADIENT') !== -1; });
+  }).length;
+  var hasStyles = (effectStyles.length + gradientCount) > 0;
+  var styleCount = effectStyles.length + gradientCount;
+
   // Check if any frames already exist on current page
   var existingFrames = figma.currentPage.findAll(function(n) {
     return n.type === 'FRAME' && summary.some(function(c) { return n.name === c.name; });
@@ -23,7 +32,7 @@ figma.showUI(__html__, { width: 480, height: 560, themeColors: true });
   var hasExisting = existingFrames.length > 0;
   var existingNames = existingFrames.map(function(f) { return f.name; });
 
-  figma.ui.postMessage({ type: 'collections', data: summary, version: VERSION, hasExisting: hasExisting, existingNames: existingNames });
+  figma.ui.postMessage({ type: 'collections', data: summary, version: VERSION, hasExisting: hasExisting, existingNames: existingNames, hasStyles: hasStyles, styleCount: styleCount });
 })();
 
 figma.ui.onmessage = async function(msg) {
@@ -60,8 +69,14 @@ figma.ui.onmessage = async function(msg) {
         ]);
       } catch(e) {}
     }
-    try { buildAll(msg.collectionIds); }
-    catch(err) { figma.ui.postMessage({ type: 'error', message: String(err) }); return; }
+    if (msg.collectionIds && msg.collectionIds.length > 0) {
+      try { buildAll(msg.collectionIds); }
+      catch(err) { figma.ui.postMessage({ type: 'error', message: String(err) }); return; }
+    }
+    if (msg.buildStyles) {
+      try { buildStylesFrame(); }
+      catch(err) { figma.ui.postMessage({ type: 'error', message: String(err) }); return; }
+    }
     figma.ui.postMessage({ type: 'done' });
   }
   if (msg.type === 'close') figma.closePlugin();
@@ -181,9 +196,6 @@ function buildAll(collectionIds) {
     else buildPrimitives(outer, col);
     colCount++;
   }
-
-  // Always append effects/gradients section if any exist
-  buildEffects(outer);
 
   figma.currentPage.appendChild(outer);
   figma.viewport.scrollAndZoomIntoView([outer]);
@@ -584,60 +596,66 @@ function buildThemeModeCard(variable, res, primary) {
   return card;
 }
 
+
 // ══════════════════════════════════════════════════════════════════════════════
-// EFFECTS & GRADIENTS
-// Groups: by effect type (Drop Shadow, Inner Shadow, Blur) + Gradient paint styles
+// STYLES FRAME — gradients + effects as separate frame
 // ══════════════════════════════════════════════════════════════════════════════
-function buildEffects(outer) {
-  // Collect effect styles grouped by type
+function buildStylesFrame() {
+  // Remove existing styles frame
+  figma.currentPage.findAll(function(n) {
+    return n.type === 'FRAME' && n.name === 'Effects & Gradients';
+  }).forEach(function(f) { f.remove(); });
+
   var effectStyles = figma.getLocalEffectStyles();
   var paintStyles  = figma.getLocalPaintStyles();
 
+  // Group paint styles (gradients) by first path segment
   var groups = {}, groupOrder = [];
 
-  // ── Effect styles (shadows, blurs) ──
-  for (var i = 0; i < effectStyles.length; i++) {
-    var s = effectStyles[i];
-    if (!s.effects || s.effects.length === 0) continue;
-    // Group by primary effect type
-    var firstEffect = s.effects[0];
-    var typeName = firstEffect.type === 'DROP_SHADOW'    ? 'Drop Shadow'
-                 : firstEffect.type === 'INNER_SHADOW'   ? 'Inner Shadow'
-                 : firstEffect.type === 'LAYER_BLUR'     ? 'Blur'
-                 : firstEffect.type === 'BACKGROUND_BLUR'? 'Background Blur'
-                 : 'Other';
-    // Use path prefix if style has slashes
-    var parts = s.name.split('/');
-    var gKey = parts.length > 1 ? parts[0] : typeName;
-    if (!groups[gKey]) { groups[gKey] = { label: gKey, items: [] }; groupOrder.push(gKey); }
-    groups[gKey].items.push({ kind: 'effect', style: s, name: parts[parts.length-1] });
-  }
-
-  // ── Paint styles that are gradients ──
   for (var j = 0; j < paintStyles.length; j++) {
     var ps = paintStyles[j];
     var isGradient = ps.paints && ps.paints.some(function(p) {
-      return p.type === 'GRADIENT_LINEAR' || p.type === 'GRADIENT_RADIAL' || p.type === 'GRADIENT_ANGULAR';
+      return p.type.indexOf('GRADIENT') !== -1;
     });
     if (!isGradient) continue;
     var pparts = ps.name.split('/');
-    var pgKey = pparts.length > 1 ? pparts[0] : 'Gradient';
+    var pgKey = pparts.length > 1 ? pparts[0] : 'Gradients';
     if (!groups[pgKey]) { groups[pgKey] = { label: pgKey, items: [] }; groupOrder.push(pgKey); }
-    groups[pgKey].items.push({ kind: 'gradient', style: ps, name: pparts[pparts.length-1] });
+    groups[pgKey].items.push({
+      kind: 'gradient',
+      style: ps,
+      groupName: pparts.length > 1 ? pparts[1] : '',
+      dirName: pparts[pparts.length - 1]
+    });
   }
 
-  if (groupOrder.length === 0) return; // nothing to draw
+  // Group effect styles by first path segment
+  for (var i = 0; i < effectStyles.length; i++) {
+    var es = effectStyles[i];
+    if (!es.effects || es.effects.length === 0) continue;
+    var eparts = es.name.split('/');
+    var egKey = eparts[0];
+    if (!groups[egKey]) { groups[egKey] = { label: egKey, items: [] }; groupOrder.push(egKey); }
+    groups[egKey].items.push({
+      kind: 'effect',
+      style: es,
+      groupName: eparts.length > 1 ? eparts[1] : '',
+      dirName: eparts[eparts.length - 1]
+    });
+  }
 
-  // Primitives content frame: column, 16px gap, fill
-  var content = figma.createFrame();
-  content.name = 'Effects';
-  content.fills = [];
-  content.layoutMode = 'VERTICAL';
-  content.itemSpacing = 16;
-  content.primaryAxisSizingMode = 'AUTO';
-  content.counterAxisSizingMode = 'FIXED';
-  content.layoutAlign = 'STRETCH';
-  outer.appendChild(content);
+  if (groupOrder.length === 0) return;
+
+  // Outer frame: column, 16px gap, 1164px fixed, hug height
+  var outer = figma.createFrame();
+  outer.name = 'Effects & Gradients';
+  outer.fills = [];
+  outer.clipsContent = false;
+  outer.layoutMode = 'VERTICAL';
+  outer.itemSpacing = 16;
+  outer.primaryAxisSizingMode = 'AUTO';
+  outer.counterAxisSizingMode = 'FIXED';
+  outer.resize(FRAME_W, 100);
 
   for (var gi = 0; gi < groupOrder.length; gi++) {
     var g = groups[groupOrder[gi]];
@@ -651,7 +669,7 @@ function buildEffects(outer) {
     gf.primaryAxisSizingMode = 'AUTO';
     gf.counterAxisSizingMode = 'FIXED';
     gf.layoutAlign = 'STRETCH';
-    content.appendChild(gf);
+    outer.appendChild(gf);
 
     // Group name header
     var gnc = figma.createFrame();
@@ -669,7 +687,7 @@ function buildEffects(outer) {
     lbl.textAutoResize = 'WIDTH_AND_HEIGHT';
     gnc.appendChild(lbl);
 
-    // Cards wrap
+    // Cards wrap: row wrap, fill, 4px gap
     var vf = figma.createFrame();
     vf.name = 'Varibles';
     vf.fills = [];
@@ -685,17 +703,20 @@ function buildEffects(outer) {
     for (var ii = 0; ii < g.items.length; ii++) {
       var item = g.items[ii];
       var card = item.kind === 'gradient'
-        ? buildGradientCard(item.style, item.name)
-        : buildEffectCard(item.style, item.name);
+        ? buildStyleGradientCard(item)
+        : buildStyleEffectCard(item);
       vf.appendChild(card);
     }
   }
+
+  figma.currentPage.appendChild(outer);
+  figma.viewport.scrollAndZoomIntoView([outer]);
 }
 
-function buildEffectCard(style, label) {
-  // Card: 229.6px wide, hug height
+// Gradient card: 52px swatch with checkerboard + gradient, group + direction + variable names
+function buildStyleGradientCard(item) {
   var card = figma.createFrame();
-  card.name = label;
+  card.name = 'Varible';
   card.fills = [{ type: 'SOLID', color: { r:1, g:1, b:1 }, opacity: 0.8 }];
   card.cornerRadius = 20;
   card.layoutMode = 'HORIZONTAL';
@@ -704,24 +725,51 @@ function buildEffectCard(style, label) {
   card.counterAxisAlignItems = 'CENTER';
   card.primaryAxisSizingMode = 'FIXED';
   card.counterAxisSizingMode = 'AUTO';
-  card.resize(229.6, 58);
+  // Fill available width — will be set by parent wrap
+  card.layoutAlign = 'INHERIT';
 
-  // Preview circle showing the effect
-  var preview = figma.createEllipse();
-  preview.name = 'Preview';
-  preview.resize(26, 26);
-  preview.fills = [{ type: 'SOLID', color: { r:0.9, g:0.9, b:0.9 } }];
-  // Apply the effect to the preview shape
-  try { preview.effects = style.effects; } catch(e) {}
-  preview.layoutAlign = 'INHERIT';
-  preview.layoutGrow = 0;
-  card.appendChild(preview);
+  // Swatch outer: 52×52, 4px pad, rgba(0,0,0,0.5) stroke
+  var so = figma.createFrame();
+  so.name = 'Color';
+  so.layoutMode = 'NONE';
+  so.fills = [];
+  so.strokes = [{ type: 'SOLID', color: { r:0, g:0, b:0 }, opacity: 0.5 }];
+  so.strokeWeight = 1;
+  so.cornerRadius = 4;
+  so.resize(52, 52);
+  so.layoutAlign = 'INHERIT';
+  so.layoutGrow = 0;
+  card.appendChild(so);
 
-  // Name + CSS value
+  // Checkerboard bg
+  var checker = figma.createFrame();
+  checker.name = 'BG-img';
+  checker.layoutMode = 'NONE';
+  checker.fills = [{ type: 'SOLID', color: { r:0.85, g:0.85, b:0.85 } }];
+  checker.cornerRadius = 2;
+  checker.resize(44, 44);
+  checker.x = 4; checker.y = 4;
+  so.appendChild(checker);
+
+  // Gradient on top
+  var gradRect = figma.createFrame();
+  gradRect.name = 'Color';
+  gradRect.layoutMode = 'NONE';
+  gradRect.cornerRadius = 2;
+  gradRect.resize(44, 44);
+  gradRect.x = 4; gradRect.y = 4;
+  try {
+    gradRect.fills = item.style.paints;
+  } catch(e) {
+    gradRect.fills = [{ type: 'SOLID', color: { r:0.8, g:0.8, b:0.8 } }];
+  }
+  so.appendChild(gradRect);
+
+  // Text column
   var nh = figma.createFrame();
   nh.name = 'NameHex'; nh.fills = [];
   nh.layoutMode = 'VERTICAL';
-  nh.itemSpacing = 4;
+  nh.itemSpacing = 8;
   nh.primaryAxisSizingMode = 'AUTO';
   nh.counterAxisSizingMode = 'FIXED';
   nh.primaryAxisAlignItems = 'CENTER';
@@ -729,14 +777,86 @@ function buildEffectCard(style, label) {
   nh.layoutAlign = 'STRETCH';
   card.appendChild(nh);
 
-  var nameT = makeText(label, 12, 0, 0, 0, 1);
-  nameT.letterSpacing = { value: -1, unit: 'PERCENT' };
-  nameT.layoutAlign = 'STRETCH';
-  nameT.textAutoResize = 'HEIGHT';
+  // GradientName row: group name (50%) + direction (black)
+  var gn = figma.createFrame();
+  gn.name = 'GradientName'; gn.fills = [];
+  gn.layoutMode = 'VERTICAL';
+  gn.itemSpacing = 4;
+  gn.primaryAxisSizingMode = 'AUTO';
+  gn.counterAxisSizingMode = 'FIXED';
+  gn.layoutAlign = 'STRETCH';
+  nh.appendChild(gn);
+
+  if (item.groupName) {
+    var grpT = makeText(item.groupName, 12, 0, 0, 0, 0.5);
+    grpT.textAutoResize = 'WIDTH_AND_HEIGHT';
+    gn.appendChild(grpT);
+  }
+
+  var dirT = makeText(item.dirName, 12, 0, 0, 0, 1);
+  dirT.textAutoResize = 'WIDTH_AND_HEIGHT';
+  gn.appendChild(dirT);
+
+  // CSS variable names from gradient stops
+  var varNames = getGradientVarNames(item.style);
+  if (varNames) {
+    var varT = makeText(varNames, 12, 0, 0, 0, 0.5);
+    varT.letterSpacing = { value: -1, unit: 'PERCENT' };
+    varT.layoutAlign = 'STRETCH';
+    varT.textAutoResize = 'HEIGHT';
+    nh.appendChild(varT);
+  }
+
+  return card;
+}
+
+// Effect card: circle preview with effect applied
+function buildStyleEffectCard(item) {
+  var card = figma.createFrame();
+  card.name = 'Varible';
+  card.fills = [{ type: 'SOLID', color: { r:1, g:1, b:1 }, opacity: 0.8 }];
+  card.cornerRadius = 20;
+  card.layoutMode = 'HORIZONTAL';
+  card.itemSpacing = 12;
+  card.paddingLeft = card.paddingRight = card.paddingTop = card.paddingBottom = 16;
+  card.counterAxisAlignItems = 'CENTER';
+  card.primaryAxisSizingMode = 'FIXED';
+  card.counterAxisSizingMode = 'AUTO';
+  card.layoutAlign = 'INHERIT';
+
+  // Preview circle
+  var preview = figma.createEllipse();
+  preview.name = 'Preview';
+  preview.resize(44, 44);
+  preview.fills = [{ type: 'SOLID', color: { r:0.9, g:0.9, b:0.9 } }];
+  try { preview.effects = item.style.effects; } catch(e) {}
+  preview.layoutAlign = 'INHERIT';
+  preview.layoutGrow = 0;
+  card.appendChild(preview);
+
+  // Text col
+  var nh = figma.createFrame();
+  nh.name = 'NameHex'; nh.fills = [];
+  nh.layoutMode = 'VERTICAL';
+  nh.itemSpacing = 8;
+  nh.primaryAxisSizingMode = 'AUTO';
+  nh.counterAxisSizingMode = 'FIXED';
+  nh.primaryAxisAlignItems = 'CENTER';
+  nh.layoutGrow = 1;
+  nh.layoutAlign = 'STRETCH';
+  card.appendChild(nh);
+
+  if (item.groupName) {
+    var grpT = makeText(item.groupName, 12, 0, 0, 0, 0.5);
+    grpT.textAutoResize = 'WIDTH_AND_HEIGHT';
+    nh.appendChild(grpT);
+  }
+
+  var nameT = makeText(item.dirName, 12, 0, 0, 0, 1);
+  nameT.textAutoResize = 'WIDTH_AND_HEIGHT';
   nh.appendChild(nameT);
 
-  // CSS value summary
-  var cssVal = effectToCss(style.effects);
+  var cssVal = effectToCss(item.style.effects);
   if (cssVal) {
     var cssT = makeText(cssVal, 10, 0, 0, 0, 0.5);
     cssT.letterSpacing = { value: -1, unit: 'PERCENT' };
@@ -748,59 +868,25 @@ function buildEffectCard(style, label) {
   return card;
 }
 
-function buildGradientCard(style, label) {
-  var card = figma.createFrame();
-  card.name = label;
-  card.fills = [{ type: 'SOLID', color: { r:1, g:1, b:1 }, opacity: 0.8 }];
-  card.cornerRadius = 20;
-  card.layoutMode = 'HORIZONTAL';
-  card.itemSpacing = 12;
-  card.paddingLeft = card.paddingRight = card.paddingTop = card.paddingBottom = 16;
-  card.counterAxisAlignItems = 'CENTER';
-  card.primaryAxisSizingMode = 'FIXED';
-  card.counterAxisSizingMode = 'AUTO';
-  card.resize(229.6, 58);
-
-  // Preview circle with gradient applied
-  var preview = figma.createEllipse();
-  preview.name = 'Preview';
-  preview.resize(26, 26);
-  try { preview.fills = style.paints; } catch(e) {
-    preview.fills = [{ type: 'SOLID', color: { r:0.8, g:0.8, b:0.8 } }];
-  }
-  preview.layoutAlign = 'INHERIT';
-  preview.layoutGrow = 0;
-  card.appendChild(preview);
-
-  var nh = figma.createFrame();
-  nh.name = 'NameHex'; nh.fills = [];
-  nh.layoutMode = 'VERTICAL';
-  nh.itemSpacing = 4;
-  nh.primaryAxisSizingMode = 'AUTO';
-  nh.counterAxisSizingMode = 'FIXED';
-  nh.primaryAxisAlignItems = 'CENTER';
-  nh.layoutGrow = 1;
-  nh.layoutAlign = 'STRETCH';
-  card.appendChild(nh);
-
-  var nameT = makeText(label, 12, 0, 0, 0, 1);
-  nameT.letterSpacing = { value: -1, unit: 'PERCENT' };
-  nameT.layoutAlign = 'STRETCH';
-  nameT.textAutoResize = 'HEIGHT';
-  nh.appendChild(nameT);
-
-  // Direction hint
-  var paint = style.paints[0];
-  var dir = gradientDirection(paint);
-  if (dir) {
-    var dirT = makeText(dir, 10, 0, 0, 0, 0.5);
-    dirT.letterSpacing = { value: -1, unit: 'PERCENT' };
-    dirT.layoutAlign = 'STRETCH';
-    dirT.textAutoResize = 'HEIGHT';
-    nh.appendChild(dirT);
-  }
-
-  return card;
+function getGradientVarNames(paintStyle) {
+  // Try to extract colour stop variable names if bound
+  var names = [];
+  try {
+    var paints = paintStyle.paints;
+    for (var i = 0; i < paints.length; i++) {
+      var p = paints[i];
+      if (p.gradientStops) {
+        for (var s = 0; s < p.gradientStops.length; s++) {
+          var stop = p.gradientStops[s];
+          if (stop.boundVariables && stop.boundVariables.color) {
+            var v = figma.variables.getVariableById(stop.boundVariables.color.id);
+            if (v) names.push('--' + v.name.replace(/\//g,'-').toLowerCase());
+          }
+        }
+      }
+    }
+  } catch(e) {}
+  return names.length ? names.join('\n') : null;
 }
 
 function effectToCss(effects) {
@@ -818,14 +904,4 @@ function effectToCss(effects) {
     }
   }
   return parts.join(', ');
-}
-
-function gradientDirection(paint) {
-  if (!paint || !paint.gradientHandlePositions) return null;
-  var handles = paint.gradientHandlePositions;
-  if (handles.length < 2) return null;
-  var dx = handles[1].x - handles[0].x;
-  var dy = handles[1].y - handles[0].y;
-  var angle = Math.round(Math.atan2(dy, dx) * 180 / Math.PI);
-  return angle + '°';
 }

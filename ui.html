@@ -108,7 +108,7 @@
 <div class="screen hidden" id="s-pick">
   <div class="pick">
     <div class="pick-title">Select collections to visualise</div>
-    <div class="pick-sub">Select collections to visualise. Effect &amp; gradient styles are included automatically.</div>
+    <div class="pick-sub">Select collections and styles to visualise.</div>
     <div class="sel-bar">
       <span class="sel-count"><b id="count">0</b> selected</span>
       <button class="btn-link" onclick="toggleAll()">Select all</button>
@@ -117,7 +117,7 @@
     <div class="pick-footer">
       <div>
         <div class="existing-note" id="existing-note"></div>
-        <div class="footer-note">Effect &amp; gradient styles append automatically. Frames replace on re-run.</div>
+        <div class="footer-note">Each selection generates a separate frame. Re-run to update.</div>
       </div>
       <button class="btn btn-primary" id="btn-build" disabled onclick="startBuild()">Build frames</button>
     </div>
@@ -159,6 +159,7 @@
 <script>
 var collections = [];
 var selected = {};
+var stylesSelected = false;
 
 window.onmessage = function(e) {
   var msg = e.data.pluginMessage;
@@ -166,10 +167,10 @@ window.onmessage = function(e) {
   if (msg.type === 'collections') {
     collections = msg.data;
     document.getElementById('ver-sub').textContent = 'Colour Variables · v' + msg.version;
-    if (!collections.length) { show('s-empty'); return; }
+    if (!collections.length && !msg.hasStyles) { show('s-empty'); return; }
     collections.forEach(function(c) { selected[c.id] = true; });
-    renderList();
-    // Show Update btn if frames already exist
+    stylesSelected = msg.hasStyles || false;
+    renderList(msg.hasStyles, msg.styleCount);
     if (msg.hasExisting && msg.existingNames && msg.existingNames.length) {
       document.getElementById('btn-build').textContent = 'Update frames';
       document.getElementById('btn-build').classList.add('btn-update');
@@ -207,7 +208,7 @@ window.onmessage = function(e) {
   }
 };
 
-function renderList() {
+function renderList(hasStyles, styleCount) {
   var list = document.getElementById('col-list');
   list.innerHTML = '';
   collections.forEach(function(col) {
@@ -220,6 +221,21 @@ function renderList() {
     card.onclick = function() { toggle(col.id, card); };
     list.appendChild(card);
   });
+  // Add Effects & Gradients card if styles exist
+  if (hasStyles) {
+    var styleCard = document.createElement('div');
+    styleCard.className = 'col-card' + (stylesSelected ? ' selected' : '');
+    styleCard.id = 'styles-card';
+    styleCard.innerHTML = '<div class="col-check"><div class="col-check-inner"></div></div>'
+      + '<div class="col-info"><div class="col-name">Effects &amp; Gradients</div>'
+      + '<div class="col-meta">' + (styleCount || 0) + ' styles</div></div>';
+    styleCard.onclick = function() {
+      stylesSelected = !stylesSelected;
+      styleCard.classList.toggle('selected', stylesSelected);
+      updateCount();
+    };
+    list.appendChild(styleCard);
+  }
   updateCount();
 }
 
@@ -240,6 +256,7 @@ function toggleAll() {
 
 function updateCount() {
   var n = collections.filter(function(c) { return selected[c.id]; }).length;
+  if (stylesSelected) n++;
   document.getElementById('count').textContent = n;
   document.getElementById('btn-build').disabled = n === 0;
 }
@@ -247,12 +264,14 @@ function updateCount() {
 function startBuild() {
   var ids = collections.filter(function(c) { return selected[c.id]; }).map(function(c) { return c.id; });
   var steps = document.getElementById('prog-steps');
-  steps.innerHTML = ids.map(function(id) {
+  var stepItems = ids.map(function(id) {
     var col = collections.find(function(c) { return c.id === id; });
     return '<div class="prog-step"><div class="step-dot"></div><span>' + esc(col ? col.name : id) + '</span></div>';
-  }).join('');
+  });
+  if (stylesSelected) stepItems.push('<div class="prog-step"><div class="step-dot"></div><span>Effects &amp; Gradients</span></div>');
+  steps.innerHTML = stepItems.join('');
   show('s-progress');
-  parent.postMessage({ pluginMessage: { type: 'build', collectionIds: ids } }, '*');
+  parent.postMessage({ pluginMessage: { type: 'build', collectionIds: ids, buildStyles: stylesSelected } }, '*');
 }
 
 function showPick() { show('s-pick'); }
