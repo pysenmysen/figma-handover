@@ -249,6 +249,7 @@ function buildPrimitives(outer, col) {
     vf.layoutMode = 'HORIZONTAL';
     vf.layoutWrap = 'WRAP';
     vf.itemSpacing = 4;
+    vf.counterAxisSpacing = 4;
     vf.primaryAxisSizingMode = 'FIXED';
     vf.counterAxisSizingMode = 'AUTO';
     vf.layoutAlign = 'STRETCH';
