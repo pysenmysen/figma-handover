@@ -189,7 +189,7 @@ function parseTokens(json, filename) {
         var group = groups.find(function(g) { return g.key === groupKey; });
         if (!group) { group = { key: groupKey, label: groupKey, tokens: [] }; groups.push(group); }
 
-        group.tokens.push({ name: tokenName, hex: hex.toUpperCase(), alpha: alpha });
+        group.tokens.push({ name: tokenName, cssName: tokenName, hex: hex.toUpperCase(), alpha: alpha });
         totalColors++;
       }
       return;
