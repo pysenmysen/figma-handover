@@ -24,7 +24,7 @@ figma.ui.onmessage = async function(msg) {
     // Try Neue Haas Grotesk Display Pro (Grebban brand font)
     // Weight 450 = Roman in Neue Haas. Try each style with timeout.
     var fontLoaded = false;
-    var nhStyles = ['Roman', '45 Light', '55 Roman', 'Regular'];
+    var nhStyles = ['Regular', 'Roman', '55 Roman', '45 Light'];
     for (var fi = 0; fi < nhStyles.length; fi++) {
       try {
         await Promise.race([
