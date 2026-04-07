@@ -1,7 +1,7 @@
 // Grebbans Handover — code.js v3.2
 
 var VERSION = '3.2';
-var FRAME_W = 1504; // outer frame fixed width
+var FRAME_W = 1164; // outer frame fixed width
 
 figma.showUI(__html__, { width: 480, height: 560, themeColors: true });
 
@@ -460,7 +460,7 @@ function buildThemeHeader(parent, label) {
   hdr.layoutAlign = 'STRETCH';
   parent.appendChild(hdr);
 
-  var t = makeText(label, 12, 0, 0, 0, 0.5);
+  var t = makeText(label, 16, 0, 0, 0, 1);
   t.textAutoResize = 'WIDTH_AND_HEIGHT';
   hdr.appendChild(t);
 }
@@ -480,21 +480,21 @@ function buildSeparator(parent) {
   parent.appendChild(sep);
 }
 
-// Semantic name card — token name only, no swatch
+// Semantic name card — token name only, no swatch, fixed 40px height
 function buildThemeNameCard(cssName, primary) {
   var card = figma.createFrame();
   card.name = 'Colou';
   card.fills = [{ type: 'SOLID', color: { r:1, g:1, b:1 }, opacity: primary ? 0.8 : 0.3 }];
   card.cornerRadius = 20;
   card.layoutMode = 'HORIZONTAL';
-  card.layoutWrap = 'WRAP';
   card.itemSpacing = 12;
   card.paddingLeft = card.paddingRight = 16;
-  card.paddingTop = card.paddingBottom = 12;
+  card.paddingTop = card.paddingBottom = 0;
   card.primaryAxisSizingMode = 'FIXED';
-  card.counterAxisSizingMode = 'AUTO';
+  card.counterAxisSizingMode = 'FIXED';
   card.counterAxisAlignItems = 'CENTER';
   card.layoutAlign = 'STRETCH';
+  card.resize(10, 40);
 
   var t = makeText(cssName, 12, 0, 0, 0, 1);
   t.textAutoResize = 'WIDTH_AND_HEIGHT';
@@ -503,7 +503,7 @@ function buildThemeNameCard(cssName, primary) {
   return card;
 }
 
-// Mode card — swatch + primitive name
+// Mode card — swatch + primitive name, fixed 40px height
 function buildThemeModeCard(variable, res, primary) {
   var card = figma.createFrame();
   card.name = 'Colou';
@@ -512,11 +512,12 @@ function buildThemeModeCard(variable, res, primary) {
   card.layoutMode = 'HORIZONTAL';
   card.itemSpacing = 12;
   card.paddingLeft = card.paddingRight = 16;
-  card.paddingTop = card.paddingBottom = 12;
+  card.paddingTop = card.paddingBottom = 0;
   card.primaryAxisSizingMode = 'FIXED';
-  card.counterAxisSizingMode = 'AUTO';
+  card.counterAxisSizingMode = 'FIXED';
   card.counterAxisAlignItems = 'CENTER';
   card.layoutAlign = 'STRETCH';
+  card.resize(10, 40);
 
   if (!res) {
     var dash = makeText('—', 12, 0, 0, 0, 0.4);
@@ -552,7 +553,7 @@ function buildThemeModeCard(variable, res, primary) {
   var primName = res.aliasName
     ? '--' + res.aliasName.replace(/\//g,'-').toLowerCase()
     : toHex(res.rgba.r, res.rgba.g, res.rgba.b);
-  var pt = makeText(primName, 12, 0, 0, 0, 0.7);
+  var pt = makeText(primName, 12, 0, 0, 0, 1);
   pt.layoutGrow = 1;
   pt.textAutoResize = 'HEIGHT';
   pt.layoutAlign = 'INHERIT';
