@@ -298,11 +298,17 @@ function buildCard(token) {
   si.name = 'Color'; si.cornerRadius = 2;
   si.resize(18, 18); si.x = 4; si.y = 4;
   var colorFill = { type: 'SOLID', color: { r: token.r, g: token.g, b: token.b }, opacity: token.alpha };
+  // Always add checkerboard base for transparency visibility
+  var checker = figma.createRectangle();
+  checker.name = 'Checker'; checker.cornerRadius = 2;
+  checker.resize(18, 18); checker.x = 4; checker.y = 4;
+  checker.fills = [{ type: 'SOLID', color: { r:0.85, g:0.85, b:0.85 } }];
+  so.appendChild(checker);
   try {
     var bf = figma.variables.setBoundVariableForPaint(colorFill, 'color', figma.variables.getVariableById(token.variableId));
-    si.fills = hasAlpha ? [{ type: 'SOLID', color: { r:0.85, g:0.85, b:0.85 } }, bf] : [bf];
+    si.fills = [bf];
   } catch(e) {
-    si.fills = hasAlpha ? [{ type: 'SOLID', color: { r:0.85, g:0.85, b:0.85 } }, colorFill] : [colorFill];
+    si.fills = [colorFill];
   }
   so.appendChild(si);
 
@@ -475,7 +481,7 @@ function buildSeparator(parent) {
   sep.paddingBottom = 12;
   sep.primaryAxisSizingMode = 'FIXED';
   sep.counterAxisSizingMode = 'AUTO';
-  sep.resize(10, 28);
+  sep.resize(10, 8);
   sep.layoutAlign = 'STRETCH';
   parent.appendChild(sep);
 }
@@ -531,21 +537,27 @@ function buildThemeModeCard(variable, res, primary) {
   so.name = 'Color'; so.fills = [];
   so.layoutMode = 'NONE';
   so.strokes = [{ type: 'SOLID', color: { r:0, g:0, b:0 }, opacity: 0.5 }];
-  so.strokeWeight = 1; so.cornerRadius = 4;
-  so.resize(26, 26);
+  so.strokeWeight = 1; so.cornerRadius = 3;
+  so.resize(16, 16);
   so.layoutAlign = 'INHERIT'; so.layoutGrow = 0;
   card.appendChild(so);
 
   var si = figma.createRectangle();
   si.name = 'Color'; si.cornerRadius = 2;
-  si.resize(18, 18); si.x = 4; si.y = 4;
+  si.resize(10, 10); si.x = 3; si.y = 3;
   var hasAlpha = res.rgba.a < 0.99;
   var colorFill = { type: 'SOLID', color: { r: res.rgba.r, g: res.rgba.g, b: res.rgba.b }, opacity: res.rgba.a };
+  // Always add checkerboard base
+  var checker2 = figma.createRectangle();
+  checker2.name = 'Checker'; checker2.cornerRadius = 2;
+  checker2.resize(10, 10); checker2.x = 3; checker2.y = 3;
+  checker2.fills = [{ type: 'SOLID', color: { r:0.85, g:0.85, b:0.85 } }];
+  so.appendChild(checker2);
   try {
     var bf = figma.variables.setBoundVariableForPaint(colorFill, 'color', figma.variables.getVariableById(variable.id));
-    si.fills = hasAlpha ? [{ type: 'SOLID', color: { r:0.85, g:0.85, b:0.85 } }, bf] : [bf];
+    si.fills = [bf];
   } catch(e) {
-    si.fills = hasAlpha ? [{ type: 'SOLID', color: { r:0.85, g:0.85, b:0.85 } }, colorFill] : [colorFill];
+    si.fills = [colorFill];
   }
   so.appendChild(si);
 
