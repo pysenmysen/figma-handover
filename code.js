@@ -60,11 +60,8 @@ function isSemantic(col) {
 var F = 'Inter';
 
 async function loadFonts() {
-  // Inter is always available in Figma — load this first so we never hang
   await figma.loadFontAsync({ family: 'Inter', style: 'Regular' });
   F = 'Inter';
-  // Try Neue Haas non-blocking after Inter is ready
-  try { await figma.loadFontAsync({ family: 'Neue Haas Grotesk Display Pro', style: 'Roman' }); F = 'Neue Haas Grotesk Display Pro'; } catch(e) {}
 }
 
 function T(chars, size, r, g, b, a, align) {
