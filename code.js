@@ -27,6 +27,8 @@ figma.ui.onmessage = async function(msg) {
         new Promise(function(_, r) { setTimeout(r, 2000); })
       ]);
     } catch(e) {}
+    // Find text styles from library
+    findTextStyles();
     // Find and load font-family variable
     var fontInfo = findFontVariable();
     if (fontInfo) {
@@ -63,6 +65,19 @@ function resolveColor(raw, modeId) {
 
 // ─── Find font-family string variable ─────────────────────────────────────────
 var FONT_VAR = null;
+
+// Text styles from Core + Third Party Library
+var STYLE_12 = null;  // 📋 Handover/12_100 — 12px / 100% lh
+var STYLE_16 = null;  // 📋 Handover/16_110 — 16px / 110% lh
+
+function findTextStyles() {
+  var styles = figma.getLocalTextStyles();
+  for (var i = 0; i < styles.length; i++) {
+    var s = styles[i];
+    if (s.name === '📋 Handover/12_100') STYLE_12 = s.id;
+    if (s.name === '📋 Handover/16_110') STYLE_16 = s.id;
+  }
+}
 
 function findFontVariable() {
   var collections = figma.variables.getLocalVariableCollections();
@@ -103,13 +118,21 @@ function toHex(r, g, b) {
 
 function makeText(chars, size, r, g, b, a) {
   var t = figma.createText();
-  try { t.fontName = { family: 'Inter', style: 'Regular' }; } catch(e) {}
-  t.fontSize = size;
-  t.characters = String(chars);
-  // Bind --font-family variable to fontFamily if available
-  if (FONT_VAR) {
-    try { t.setBoundVariable('fontFamily', FONT_VAR); } catch(e) {}
+  // Try to apply library text style first
+  var styleId = (size >= 16) ? STYLE_16 : STYLE_12;
+  var styledApplied = false;
+  if (styleId) {
+    try { t.textStyleId = styleId; styledApplied = true; } catch(e) {}
   }
+  // Fallback: manual font + bind font-family variable
+  if (!styledApplied) {
+    try { t.fontName = { family: 'Inter', style: 'Regular' }; } catch(e) {}
+    if (FONT_VAR) {
+      try { t.setBoundVariable('fontFamily', FONT_VAR); } catch(e) {}
+    }
+    t.fontSize = size;
+  }
+  t.characters = String(chars);
   var fill = { type: 'SOLID', color: { r:r||0, g:g||0, b:b||0 } };
   if (a !== undefined && a < 1) fill.opacity = a;
   t.fills = [fill];
