@@ -713,7 +713,8 @@ function buildStylesFrame() {
   figma.viewport.scrollAndZoomIntoView([outer]);
 }
 
-// Gradient card: 52px swatch with checkerboard + gradient, group + direction + variable names
+// Gradient card — matches reference exactly
+// Card: fill width (layoutGrow=1), hug height, 52px swatch
 function buildStyleGradientCard(item) {
   var card = figma.createFrame();
   card.name = 'Varible';
@@ -725,47 +726,36 @@ function buildStyleGradientCard(item) {
   card.counterAxisAlignItems = 'CENTER';
   card.primaryAxisSizingMode = 'FIXED';
   card.counterAxisSizingMode = 'AUTO';
-  card.resize(267, 100); // width set — height will hug
-  card.layoutAlign = 'INHERIT';
+  card.resize(267, 52);
+  card.layoutGrow = 1; // fill row width in wrap
 
-  // Swatch outer: 52×52, 4px pad, rgba(0,0,0,0.5) stroke
+  // Swatch outer: 52×52, NONE layout, rgba(0,0,0,0.5) stroke, 4px radius
   var so = figma.createFrame();
-  so.name = 'Color';
+  so.name = 'Color'; so.fills = [];
   so.layoutMode = 'NONE';
-  so.fills = [];
   so.strokes = [{ type: 'SOLID', color: { r:0, g:0, b:0 }, opacity: 0.5 }];
-  so.strokeWeight = 1;
-  so.cornerRadius = 4;
+  so.strokeWeight = 1; so.cornerRadius = 4;
   so.resize(52, 52);
-  so.layoutAlign = 'INHERIT';
-  so.layoutGrow = 0;
+  so.layoutAlign = 'INHERIT'; so.layoutGrow = 0;
   card.appendChild(so);
 
-  // Checkerboard bg
+  // Checkerboard bg: NONE frame, 44×44 at (4,4) — #D9D9D9
   var checker = figma.createFrame();
-  checker.name = 'BG-img';
-  checker.layoutMode = 'NONE';
-  checker.fills = [{ type: 'SOLID', color: { r:0.85, g:0.85, b:0.85 } }];
-  checker.cornerRadius = 2;
-  checker.resize(44, 44);
-  checker.x = 4; checker.y = 4;
+  checker.name = 'BG-img'; checker.fills = [{ type: 'SOLID', color: { r:0.851, g:0.851, b:0.851 } }];
+  checker.layoutMode = 'NONE'; checker.cornerRadius = 2;
+  checker.resize(44, 44); checker.x = 4; checker.y = 4;
   so.appendChild(checker);
 
-  // Gradient on top
+  // Gradient on top: NONE frame, 44×44 at (4,4)
   var gradRect = figma.createFrame();
-  gradRect.name = 'Color';
-  gradRect.layoutMode = 'NONE';
-  gradRect.cornerRadius = 2;
-  gradRect.resize(44, 44);
+  gradRect.name = 'Color'; gradRect.layoutMode = 'NONE';
+  gradRect.cornerRadius = 2; gradRect.resize(44, 44);
   gradRect.x = 4; gradRect.y = 4;
-  try {
-    gradRect.fills = item.style.paints;
-  } catch(e) {
-    gradRect.fills = [{ type: 'SOLID', color: { r:0.8, g:0.8, b:0.8 } }];
-  }
+  try { gradRect.fills = item.style.paints; }
+  catch(e) { gradRect.fills = [{ type: 'SOLID', color: { r:0.8, g:0.8, b:0.8 } }]; }
   so.appendChild(gradRect);
 
-  // Text column
+  // NameHex: column, center, stretch, 8px gap, fill width
   var nh = figma.createFrame();
   nh.name = 'NameHex'; nh.fills = [];
   nh.layoutMode = 'VERTICAL';
@@ -773,31 +763,31 @@ function buildStyleGradientCard(item) {
   nh.primaryAxisSizingMode = 'AUTO';
   nh.counterAxisSizingMode = 'FIXED';
   nh.primaryAxisAlignItems = 'CENTER';
-  nh.layoutGrow = 1;
-  nh.layoutAlign = 'STRETCH';
+  nh.layoutGrow = 1; nh.layoutAlign = 'STRETCH';
   card.appendChild(nh);
 
-  // GradientName row: group name (50%) + direction (black)
+  // GradientName: column, stretch, 4px gap
   var gn = figma.createFrame();
   gn.name = 'GradientName'; gn.fills = [];
-  gn.layoutMode = 'VERTICAL';
-  gn.itemSpacing = 4;
+  gn.layoutMode = 'VERTICAL'; gn.itemSpacing = 4;
   gn.primaryAxisSizingMode = 'AUTO';
   gn.counterAxisSizingMode = 'FIXED';
   gn.layoutAlign = 'STRETCH';
   nh.appendChild(gn);
 
+  // Group name: 50% opacity
   if (item.groupName) {
     var grpT = makeText(item.groupName, 12, 0, 0, 0, 0.5);
     grpT.textAutoResize = 'WIDTH_AND_HEIGHT';
     gn.appendChild(grpT);
   }
 
+  // Direction: full black
   var dirT = makeText(item.dirName, 12, 0, 0, 0, 1);
   dirT.textAutoResize = 'WIDTH_AND_HEIGHT';
   gn.appendChild(dirT);
 
-  // CSS variable names from gradient stops
+  // Variable names: fill width, 50% opacity, multiline
   var varNames = getGradientVarNames(item.style);
   if (varNames) {
     var varT = makeText(varNames, 12, 0, 0, 0, 0.5);
@@ -822,7 +812,8 @@ function buildStyleEffectCard(item) {
   card.counterAxisAlignItems = 'CENTER';
   card.primaryAxisSizingMode = 'FIXED';
   card.counterAxisSizingMode = 'AUTO';
-  card.resize(267, 100);
+  card.resize(267, 52);
+  card.layoutGrow = 1;
   card.layoutAlign = 'INHERIT';
 
   // Preview circle
