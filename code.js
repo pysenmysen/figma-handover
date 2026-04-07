@@ -321,10 +321,10 @@ function buildThemes(outer, col) {
     for (var mi2=0; mi2<modes.length; mi2++) {
       var mode=modes[mi2];
       // Try this mode's ID, then default, then first available
-      var raw=variable.valuesByMode[mode.id];
-      if (!raw) raw=variable.valuesByMode[col.defaultModeId];
+      var raw=variable.valuesByMode[mode.modeId];
+      if (!raw) { var keys3=Object.keys(variable.valuesByMode); if(keys3.length) raw=variable.valuesByMode[keys3[0]]; }
       if (!raw) raw=variable.valuesByMode[Object.keys(variable.valuesByMode)[0]];
-      var res=raw ? resolveColor(raw, mode.id) : null;
+      var res=raw ? resolveColor(raw, mode.modeId) : null;
 
       var mc=figma.createFrame(); mc.name=mode.name;
       mc.fills=[solid(1,1,1,1)]; mc.cornerRadius=8;
