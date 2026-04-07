@@ -726,8 +726,7 @@ function buildStyleGradientCard(item) {
   card.counterAxisAlignItems = 'CENTER';
   card.primaryAxisSizingMode = 'FIXED';
   card.counterAxisSizingMode = 'AUTO';
-  card.resize(267, 52);
-  card.layoutGrow = 1; // fill row width in wrap
+  card.resize(288, 52);
 
   // Swatch outer: 52×52, NONE layout, rgba(0,0,0,0.5) stroke, 4px radius
   var so = figma.createFrame();
@@ -812,8 +811,7 @@ function buildStyleEffectCard(item) {
   card.counterAxisAlignItems = 'CENTER';
   card.primaryAxisSizingMode = 'FIXED';
   card.counterAxisSizingMode = 'AUTO';
-  card.resize(267, 52);
-  card.layoutGrow = 1;
+  card.resize(288, 52);
   card.layoutAlign = 'INHERIT';
 
   // Preview circle
