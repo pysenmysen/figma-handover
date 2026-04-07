@@ -713,9 +713,9 @@ function buildStylesFrame() {
   figma.viewport.scrollAndZoomIntoView([outer]);
 }
 
-// Gradient card — matches reference exactly
-// Card: fill width (layoutGrow=1), hug height, 52px swatch
+// Gradient card — exact match to node 11709-16882
 function buildStyleGradientCard(item) {
+  // Card: 288px fixed, row, center, 12px gap, 16px padding, rgba(255,255,255,0.8), 20px radius
   var card = figma.createFrame();
   card.name = 'Varible';
   card.fills = [{ type: 'SOLID', color: { r:1, g:1, b:1 }, opacity: 0.8 }];
@@ -728,27 +728,40 @@ function buildStyleGradientCard(item) {
   card.counterAxisSizingMode = 'AUTO';
   card.resize(288, 52);
 
-  // Swatch outer: 52×52, NONE layout, rgba(0,0,0,0.5) stroke, 4px radius
+  // Swatch outer: 52×52, COLUMN layout, 4px padding, rgba(0,0,0,0.5) stroke, 4px radius
   var so = figma.createFrame();
-  so.name = 'Color'; so.fills = [];
-  so.layoutMode = 'NONE';
+  so.name = 'Color';
+  so.layoutMode = 'VERTICAL';
+  so.primaryAxisAlignItems = 'SPACE_BETWEEN';
+  so.counterAxisAlignItems = 'STRETCH';
+  so.paddingLeft = so.paddingRight = so.paddingTop = so.paddingBottom = 4;
+  so.itemSpacing = 6;
+  so.fills = [];
   so.strokes = [{ type: 'SOLID', color: { r:0, g:0, b:0 }, opacity: 0.5 }];
   so.strokeWeight = 1; so.cornerRadius = 4;
+  so.primaryAxisSizingMode = 'FIXED';
+  so.counterAxisSizingMode = 'FIXED';
   so.resize(52, 52);
   so.layoutAlign = 'INHERIT'; so.layoutGrow = 0;
   card.appendChild(so);
 
-  // Checkerboard bg: NONE frame, 44×44 at (4,4) — #D9D9D9
+  // BG-img: fill × fill inside padding (44×44 effectively)
   var checker = figma.createFrame();
-  checker.name = 'BG-img'; checker.fills = [{ type: 'SOLID', color: { r:0.851, g:0.851, b:0.851 } }];
-  checker.layoutMode = 'NONE'; checker.cornerRadius = 2;
-  checker.resize(44, 44); checker.x = 4; checker.y = 4;
+  checker.name = 'BG-img';
+  checker.fills = [{ type: 'SOLID', color: { r:0.851, g:0.851, b:0.851 } }];
+  checker.layoutMode = 'NONE';
+  checker.cornerRadius = 2;
+  checker.layoutAlign = 'STRETCH';
+  checker.layoutGrow = 1;
   so.appendChild(checker);
 
-  // Gradient on top: NONE frame, 44×44 at (4,4)
+  // Gradient Color: absolute positioned at (4, 4), 44×44
   var gradRect = figma.createFrame();
-  gradRect.name = 'Color'; gradRect.layoutMode = 'NONE';
-  gradRect.cornerRadius = 2; gradRect.resize(44, 44);
+  gradRect.name = 'Color';
+  gradRect.layoutMode = 'NONE';
+  gradRect.cornerRadius = 2;
+  gradRect.resize(44, 44);
+  gradRect.layoutPositioning = 'ABSOLUTE';
   gradRect.x = 4; gradRect.y = 4;
   try { gradRect.fills = item.style.paints; }
   catch(e) { gradRect.fills = [{ type: 'SOLID', color: { r:0.8, g:0.8, b:0.8 } }]; }
@@ -774,19 +787,21 @@ function buildStyleGradientCard(item) {
   gn.layoutAlign = 'STRETCH';
   nh.appendChild(gn);
 
-  // Group name: 50% opacity
+  // Group name: NONE layout, fill width, 50% opacity
   if (item.groupName) {
     var grpT = makeText(item.groupName, 12, 0, 0, 0, 0.5);
-    grpT.textAutoResize = 'WIDTH_AND_HEIGHT';
+    grpT.layoutAlign = 'STRETCH';
+    grpT.textAutoResize = 'HEIGHT';
     gn.appendChild(grpT);
   }
 
-  // Direction: full black
+  // Direction name: NONE layout, fill width, black
   var dirT = makeText(item.dirName, 12, 0, 0, 0, 1);
-  dirT.textAutoResize = 'WIDTH_AND_HEIGHT';
+  dirT.layoutAlign = 'STRETCH';
+  dirT.textAutoResize = 'HEIGHT';
   gn.appendChild(dirT);
 
-  // Variable names: fill width, 50% opacity, multiline
+  // Variable names: NONE layout, fill width, 50% opacity
   var varNames = getGradientVarNames(item.style);
   if (varNames) {
     var varT = makeText(varNames, 12, 0, 0, 0, 0.5);
