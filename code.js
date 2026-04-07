@@ -167,10 +167,11 @@ function buildAll(collectionIds) {
   var colCount = 0;
   for (var ci = 0; ci < collectionIds.length; ci++) {
     var col = figma.variables.getVariableCollectionById(collectionIds[ci]);
-    if (!col || isSemantic(col)) continue;
+    if (!col) continue;
     figma.ui.postMessage({ type: 'progress', step: ci, total: collectionIds.length, name: col.name });
     if (colCount === 0) outer.name = col.name;
-    buildPrimitives(outer, col);
+    if (isSemantic(col)) buildThemes(outer, col);
+    else buildPrimitives(outer, col);
     colCount++;
   }
 
