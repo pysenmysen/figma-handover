@@ -16,7 +16,14 @@ figma.showUI(__html__, { width: 480, height: 560, themeColors: true });
     return { id: col.id, name: col.name, colorCount: colorCount,
       modes: col.modes.map(function(m) { return { id: m.modeId, name: m.name }; }) };
   }).filter(function(c) { return c.colorCount > 0; });
-  figma.ui.postMessage({ type: 'collections', data: summary, version: VERSION });
+  // Check if any frames already exist on current page
+  var existingFrames = figma.currentPage.findAll(function(n) {
+    return n.type === 'FRAME' && summary.some(function(c) { return n.name === c.name; });
+  });
+  var hasExisting = existingFrames.length > 0;
+  var existingNames = existingFrames.map(function(f) { return f.name; });
+
+  figma.ui.postMessage({ type: 'collections', data: summary, version: VERSION, hasExisting: hasExisting, existingNames: existingNames });
 })();
 
 figma.ui.onmessage = async function(msg) {
