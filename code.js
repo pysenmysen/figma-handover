@@ -21,12 +21,25 @@ figma.showUI(__html__, { width: 480, height: 560, themeColors: true });
 
 figma.ui.onmessage = async function(msg) {
   if (msg.type === 'build') {
-    try {
-      await Promise.race([
-        figma.loadFontAsync({ family: 'Inter', style: 'Regular' }),
-        new Promise(function(_, r) { setTimeout(r, 2000); })
-      ]);
-    } catch(e) {}
+    // Try Neue Haas Grotesk Display Pro (Grebban brand font)
+    // Weight 450 = Roman in Neue Haas. Try each style with timeout.
+    var fontLoaded = false;
+    var nhStyles = ['Roman', '45 Light', '55 Roman', 'Regular'];
+    for (var fi = 0; fi < nhStyles.length; fi++) {
+      try {
+        await Promise.race([
+          figma.loadFontAsync({ family: 'Neue Haas Grotesk Display Pro', style: nhStyles[fi] }),
+          new Promise(function(_, r) { setTimeout(r, 1500); })
+        ]);
+        LOADED_FONT = { family: 'Neue Haas Grotesk Display Pro', style: nhStyles[fi] };
+        fontLoaded = true;
+        break;
+      } catch(e) {}
+    }
+    // Fallback to Inter
+    if (!fontLoaded) {
+      try { await figma.loadFontAsync({ family: 'Inter', style: 'Regular' }); LOADED_FONT = { family: 'Inter', style: 'Regular' }; } catch(e) {}
+    }
     // Find text styles from library
     findTextStyles();
     // Find and load font-family variable
@@ -65,6 +78,7 @@ function resolveColor(raw, modeId) {
 
 // ─── Find font-family string variable ─────────────────────────────────────────
 var FONT_VAR = null;
+var LOADED_FONT = { family: "Inter", style: "Regular" };
 
 // Text styles from Core + Third Party Library
 var STYLE_12 = null;  // 📋 Handover/12_100 — 12px / 100% lh
@@ -118,7 +132,9 @@ function toHex(r, g, b) {
 
 function makeText(chars, size, r, g, b, a, rightAlign) {
   var t = figma.createText();
-  try { t.fontName = { family: 'Inter', style: 'Regular' }; } catch(e) {}
+  try { t.fontName = LOADED_FONT; } catch(e) {
+    try { t.fontName = { family: 'Inter', style: 'Regular' }; } catch(e2) {}
+  }
   t.fontSize = size;
   // Exact specs from reference: -1% tracking, 121% line height
   t.letterSpacing = { value: -1, unit: 'PERCENT' };
