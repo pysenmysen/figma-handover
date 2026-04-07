@@ -116,22 +116,13 @@ function toHex(r, g, b) {
   return '#' + [r,g,b].map(function(n){ return Math.round(n*255).toString(16).padStart(2,'0').toUpperCase(); }).join('');
 }
 
-function makeText(chars, size, r, g, b, a) {
+function makeText(chars, size, r, g, b, a, rightAlign) {
   var t = figma.createText();
-  // Try to apply library text style first
-  var styleId = (size >= 16) ? STYLE_16 : STYLE_12;
-  var styledApplied = false;
-  if (styleId) {
-    try { t.textStyleId = styleId; styledApplied = true; } catch(e) {}
-  }
-  // Fallback: manual font + bind font-family variable
-  if (!styledApplied) {
-    try { t.fontName = { family: 'Inter', style: 'Regular' }; } catch(e) {}
-    if (FONT_VAR) {
-      try { t.setBoundVariable('fontFamily', FONT_VAR); } catch(e) {}
-    }
-    t.fontSize = size;
-  }
+  try { t.fontName = { family: 'Inter', style: 'Regular' }; } catch(e) {}
+  t.fontSize = size;
+  // Exact specs from reference: -1% tracking, 121% line height
+  t.letterSpacing = { value: -1, unit: 'PERCENT' };
+  if (rightAlign) t.textAlignHorizontal = 'RIGHT';
   t.characters = String(chars);
   var fill = { type: 'SOLID', color: { r:r||0, g:g||0, b:b||0 } };
   if (a !== undefined && a < 1) fill.opacity = a;
@@ -325,8 +316,7 @@ function buildCard(token) {
     hT.textAutoResize = 'WIDTH_AND_HEIGHT';
     hr.appendChild(hT);
 
-    var aT = makeText(Math.round(token.alpha * 100) + '%', 12, 0, 0, 0, 0.5);
-    aT.textAlignHorizontal = 'RIGHT';
+    var aT = makeText(Math.round(token.alpha * 100) + '%', 12, 0, 0, 0, 0.5, true);
     aT.textAutoResize = 'WIDTH_AND_HEIGHT';
     hr.appendChild(aT);
   } else {
