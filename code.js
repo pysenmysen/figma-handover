@@ -6,8 +6,22 @@ figma.showUI(__html__, { width: 420, height: 540, themeColors: true });
 
 figma.ui.onmessage = async function(msg) {
   if (msg.type === 'build') {
-    await figma.loadFontAsync({ family: 'Inter', style: 'Regular' });
-    buildFromTokens(msg.groups);
+    // Load font with 3s timeout — never hang
+    try {
+      await Promise.race([
+        figma.loadFontAsync({ family: 'Inter', style: 'Regular' }),
+        new Promise(function(_, reject) { setTimeout(function(){ reject(new Error('timeout')); }, 3000); })
+      ]);
+    } catch(e) {
+      // Font load failed or timed out — try system fallback
+      try { await figma.loadFontAsync({ family: 'Roboto', style: 'Regular' }); } catch(e2) {}
+    }
+    try {
+      buildFromTokens(msg.groups);
+    } catch(err) {
+      figma.ui.postMessage({ type: 'error', message: String(err) });
+      return;
+    }
     figma.ui.postMessage({ type: 'done' });
   }
   if (msg.type === 'close') figma.closePlugin();
