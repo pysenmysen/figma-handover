@@ -6,311 +6,261 @@
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
-    --comp: #8A38F5;
-    --comp-15: rgba(138,56,245,0.15);
-    --bg: #0F0F0F;
-    --surface: #1A1A1A;
-    --surface2: #222;
-    --border: rgba(255,255,255,0.08);
-    --border2: rgba(255,255,255,0.14);
-    --text: #F0F0F0;
-    --muted: rgba(240,240,240,0.45);
+    --comp: #8A38F5; --comp-15: rgba(138,56,245,0.15);
+    --bg: #0F0F0F; --surface: #1A1A1A; --surface2: #222;
+    --border: rgba(255,255,255,0.08); --border2: rgba(255,255,255,0.14);
+    --text: #F0F0F0; --muted: rgba(240,240,240,0.45);
     --green: #4CAF50;
   }
-  body {
-    background: var(--bg); color: var(--text);
-    font-family: -apple-system,'Helvetica Neue',sans-serif;
-    font-size: 12px; height: 100vh;
-    display: flex; flex-direction: column; overflow: hidden;
-  }
+  body { background:var(--bg); color:var(--text); font-family:-apple-system,'Helvetica Neue',sans-serif; font-size:12px; height:100vh; display:flex; flex-direction:column; overflow:hidden; }
 
   /* Header */
-  .hdr {
-    display: flex; align-items: center; gap: 10px;
-    padding: 12px 16px; border-bottom: 0.5px solid var(--border2);
-    flex-shrink: 0;
-  }
-  .logo-mark {
-    width: 24px; height: 24px; border-radius: 6px; background: var(--comp);
-    display: grid; grid-template-columns: 1fr 1fr; gap: 2.5px; padding: 5px; flex-shrink: 0;
-  }
-  .logo-mark span { display: block; border-radius: 1px; background: white; }
-  .logo-mark span:nth-child(2), .logo-mark span:nth-child(3) { opacity: 0.55; }
-  .logo-mark span:nth-child(4) { opacity: 0.25; }
-  .logo-name { font-size: 12px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
-  .logo-sub  { font-size: 10px; color: var(--muted); }
+  .hdr { display:flex; align-items:center; gap:10px; padding:12px 16px; border-bottom:0.5px solid var(--border2); flex-shrink:0; }
+  .logo-mark { width:24px; height:24px; border-radius:6px; background:var(--comp); display:grid; grid-template-columns:1fr 1fr; gap:2.5px; padding:5px; flex-shrink:0; }
+  .logo-mark span { display:block; border-radius:1px; background:white; }
+  .logo-mark span:nth-child(2), .logo-mark span:nth-child(3) { opacity:.55; }
+  .logo-mark span:nth-child(4) { opacity:.25; }
+  .logo-name { font-size:12px; font-weight:600; letter-spacing:.05em; text-transform:uppercase; }
+  .logo-sub  { font-size:10px; color:var(--muted); }
 
   /* Screens */
-  .screen { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
-  .screen.hidden { display: none !important; }
+  .screen { flex:1; overflow-y:auto; display:flex; flex-direction:column; }
+  .screen.hidden { display:none !important; }
 
-  /* ── LOADING ── */
-  .loading { flex: 1; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 10px; color: var(--muted); }
-  .spinner { width: 20px; height: 20px; border: 2px solid var(--border2); border-top-color: var(--comp); border-radius: 50%; animation: spin 0.7s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  /* ── PICK ── */
-  .pick { padding: 20px 16px 16px; display: flex; flex-direction: column; flex: 1; }
-  .pick-title { font-size: 13px; font-weight: 500; margin-bottom: 3px; }
-  .pick-sub { font-size: 11px; color: var(--muted); margin-bottom: 16px; line-height: 1.5; }
-
-  .sel-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-  .sel-count { font-size: 10px; color: var(--muted); }
-  .sel-count b { color: var(--comp); }
-  .btn-link { background: none; border: none; font-size: 10px; color: var(--muted); cursor: pointer; font-family: inherit; padding: 0; }
-  .btn-link:hover { color: var(--comp); }
-
-  .col-list { display: flex; flex-direction: column; gap: 6px; flex: 1; }
-  .col-card {
-    background: var(--surface); border: 0.5px solid var(--border);
-    border-radius: 10px; padding: 12px 14px;
-    cursor: pointer; transition: border-color 0.15s;
-    display: flex; align-items: center; gap: 12px;
+  /* Drop zone */
+  .drop-wrap { flex:1; display:flex; flex-direction:column; padding:16px; gap:12px; }
+  .drop-zone {
+    flex:1; border:1.5px dashed var(--border2); border-radius:12px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:8px; cursor:pointer; transition:border-color .15s, background .15s;
+    min-height:180px;
   }
-  .col-card:hover { border-color: var(--border2); }
-  .col-card.selected { border-color: var(--comp); background: rgba(138,56,245,0.06); }
-  .col-check {
-    width: 18px; height: 18px; border-radius: 5px; flex-shrink: 0;
-    border: 1.5px solid var(--border2); background: transparent;
-    display: flex; align-items: center; justify-content: center;
-    transition: all 0.15s;
-  }
-  .col-card.selected .col-check { background: var(--comp); border-color: var(--comp); }
-  .col-check-inner { width: 5px; height: 8px; border-right: 2px solid white; border-bottom: 2px solid white; transform: rotate(40deg) translateY(-1px); opacity: 0; transition: opacity 0.15s; }
-  .col-card.selected .col-check-inner { opacity: 1; }
-  .col-info { flex: 1; min-width: 0; }
-  .col-name { font-size: 12px; font-weight: 500; margin-bottom: 2px; }
-  .col-meta { font-size: 10px; color: var(--muted); }
-  .col-swatches { display: flex; gap: 3px; flex-shrink: 0; }
-  .mini-swatch { width: 14px; height: 14px; border-radius: 3px; border: 0.5px solid rgba(0,0,0,0.15); }
+  .drop-zone:hover, .drop-zone.over { border-color:var(--comp); background:var(--comp-15); }
+  .drop-icon { font-size:28px; opacity:.4; }
+  .drop-title { font-size:13px; font-weight:500; }
+  .drop-sub   { font-size:11px; color:var(--muted); text-align:center; line-height:1.5; }
+  .drop-btn   { font-size:11px; color:var(--comp); background:none; border:none; cursor:pointer; font-family:inherit; text-decoration:underline; padding:0; }
+  input[type=file] { display:none; }
 
-  .pick-footer {
-    margin-top: 16px; padding-top: 12px;
-    border-top: 0.5px solid var(--border);
-    display: flex; align-items: center; justify-content: space-between;
-    flex-shrink: 0;
-  }
-  .footer-note { font-size: 10px; color: var(--muted); line-height: 1.4; max-width: 220px; }
-  .btn { font-size: 11px; font-weight: 500; border-radius: 7px; border: none; cursor: pointer; padding: 7px 16px; font-family: inherit; transition: opacity 0.15s; }
-  .btn:disabled { opacity: 0.35; cursor: not-allowed; }
-  .btn-primary { background: var(--comp); color: white; }
-  .btn-primary:hover:not(:disabled) { opacity: 0.85; }
+  /* Preview */
+  .preview { background:var(--surface); border:0.5px solid var(--border); border-radius:10px; padding:12px; display:flex; flex-direction:column; gap:8px; }
+  .preview-title { font-size:11px; font-weight:500; }
+  .preview-stats { font-size:10px; color:var(--muted); }
+  .group-list { display:flex; flex-direction:column; gap:4px; max-height:140px; overflow-y:auto; }
+  .group-row { display:flex; align-items:center; justify-content:space-between; font-size:10px; padding:4px 8px; background:var(--surface2); border-radius:6px; }
+  .group-name { color:var(--text); font-family:monospace; }
+  .group-count { color:var(--comp); }
 
-  /* ── PROGRESS ── */
-  .prog-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px 24px; }
-  .prog-title { font-size: 13px; font-weight: 500; margin-bottom: 4px; }
-  .prog-sub { font-size: 11px; color: var(--muted); margin-bottom: 20px; text-align: center; }
-  .prog-bar-wrap { width: 100%; max-width: 260px; height: 3px; background: var(--border2); border-radius: 2px; margin-bottom: 20px; overflow: hidden; }
-  .prog-bar { height: 100%; background: var(--comp); border-radius: 2px; transition: width 0.35s ease; }
-  .prog-steps { width: 100%; max-width: 260px; display: flex; flex-direction: column; gap: 8px; }
-  .prog-step { display: flex; align-items: center; gap: 10px; font-size: 11px; color: var(--muted); }
-  .prog-step.active { color: var(--comp); }
-  .prog-step.done  { color: var(--text); }
-  .step-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border2); flex-shrink: 0; transition: background 0.2s; }
-  .prog-step.active .step-dot { background: var(--comp); box-shadow: 0 0 0 3px var(--comp-15); }
-  .prog-step.done .step-dot  { background: var(--green); }
+  /* Footer */
+  .footer { padding:12px 16px; border-top:0.5px solid var(--border); display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
+  .btn { font-size:11px; font-weight:500; border-radius:7px; border:none; cursor:pointer; padding:7px 16px; font-family:inherit; transition:opacity .15s; }
+  .btn:disabled { opacity:.35; cursor:not-allowed; }
+  .btn-primary { background:var(--comp); color:white; }
+  .btn-primary:hover:not(:disabled) { opacity:.85; }
+  .btn-ghost { background:transparent; color:var(--muted); border:0.5px solid var(--border2); }
+  .btn-ghost:hover { color:var(--text); }
+  .footer-note { font-size:10px; color:var(--muted); }
 
-  /* ── DONE ── */
-  .done-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 32px; }
-  .done-icon { font-size: 36px; }
-  .done-title { font-size: 14px; font-weight: 500; }
-  .done-sub { font-size: 11px; color: var(--muted); text-align: center; line-height: 1.5; }
-  .done-btns { display: flex; gap: 8px; margin-top: 8px; }
-  .btn-ghost { background: transparent; color: var(--muted); border: 0.5px solid var(--border2); }
-  .btn-ghost:hover { color: var(--text); border-color: var(--border2); }
+  /* Progress */
+  .prog-wrap { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:32px 24px; gap:12px; }
+  .prog-title { font-size:13px; font-weight:500; }
+  .prog-bar-wrap { width:100%; max-width:260px; height:3px; background:var(--border2); border-radius:2px; overflow:hidden; }
+  .prog-bar { height:100%; background:var(--comp); border-radius:2px; transition:width .35s ease; }
+  .prog-sub { font-size:11px; color:var(--muted); }
 
-  /* No collections */
-  .no-cols { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 32px; color: var(--muted); text-align: center; }
-  .no-cols-icon { font-size: 28px; opacity: 0.3; }
+  /* Done */
+  .done-wrap { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:32px; }
+  .done-icon { font-size:32px; }
+  .done-title { font-size:14px; font-weight:500; }
+  .done-sub { font-size:11px; color:var(--muted); text-align:center; line-height:1.5; }
+  .done-btns { display:flex; gap:8px; margin-top:8px; }
+
+  ::-webkit-scrollbar { width:3px; }
+  ::-webkit-scrollbar-thumb { background:var(--border2); border-radius:2px; }
 </style>
 </head>
 <body>
 
-<!-- Header -->
 <div class="hdr">
   <div class="logo-mark"><span></span><span></span><span></span><span></span></div>
   <div>
     <div class="logo-name">Grebbans</div>
-    <div class="logo-sub" id="version">Colour Variables</div>
+    <div class="logo-sub" id="ver-sub">Colour Variables · v2.0</div>
   </div>
 </div>
 
-<!-- LOADING -->
-<div class="screen" id="s-loading">
-  <div class="loading">
-    <div class="spinner"></div>
-    <span>Reading collections…</span>
-  </div>
-</div>
-
-<!-- PICK -->
-<div class="screen hidden" id="s-pick">
-  <div class="pick">
-    <div class="pick-title">Select collections to visualise</div>
-    <div class="pick-sub">Chosen collections will be drawn as colour swatch frames directly in your Figma file.</div>
-    <div class="sel-bar">
-      <span class="sel-count"><b id="count">0</b> selected</span>
-      <button class="btn-link" onclick="toggleAll()">Select all</button>
+<!-- IMPORT SCREEN -->
+<div class="screen" id="s-import">
+  <div class="drop-wrap">
+    <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+      <div class="drop-icon">⬡</div>
+      <div class="drop-title">Drop your token JSON here</div>
+      <div class="drop-sub">Supports W3C Design Token format<br>Colours only — strings and numbers are ignored</div>
+      <button class="drop-btn">or browse files</button>
     </div>
-    <div class="col-list" id="col-list"></div>
-    <div class="pick-footer">
-      <div class="footer-note">Existing Grebbans frames will be replaced on the current page.</div>
-      <button class="btn btn-ghost" id="btn-debug" onclick="runDebug()" style="font-size:10px">Debug vars</button><button class="btn btn-primary" id="btn-build" disabled onclick="startBuild()">Build frames</button>
+    <input type="file" id="file-input" accept=".json">
+
+    <div class="preview hidden" id="preview">
+      <div class="preview-title" id="preview-title">—</div>
+      <div class="preview-stats" id="preview-stats">—</div>
+      <div class="group-list" id="group-list"></div>
     </div>
   </div>
+
+  <div class="footer">
+    <span class="footer-note" id="footer-note">Select a token JSON file to begin</span>
+    <button class="btn btn-primary" id="btn-build" disabled onclick="startBuild()">Build frames</button>
+  </div>
 </div>
 
-<!-- PROGRESS -->
+<!-- PROGRESS SCREEN -->
 <div class="screen hidden" id="s-progress">
   <div class="prog-wrap">
-    <div class="prog-title" id="prog-title">Building colour frames…</div>
-    <div class="prog-sub" id="prog-sub">Starting up</div>
-    <div class="prog-bar-wrap"><div class="prog-bar" id="prog-bar" style="width:5%"></div></div>
-    <div class="prog-steps" id="prog-steps"></div>
+    <div class="prog-title">Building colour frames…</div>
+    <div class="prog-bar-wrap"><div class="prog-bar" id="prog-bar" style="width:30%"></div></div>
+    <div class="prog-sub">Drawing swatches</div>
   </div>
 </div>
 
-<!-- DONE -->
+<!-- DONE SCREEN -->
 <div class="screen hidden" id="s-done">
   <div class="done-wrap">
     <div class="done-icon">✦</div>
     <div class="done-title">Frames built!</div>
-    <div class="done-sub" id="done-sub">Colour frames are ready on your canvas.</div>
+    <div class="done-sub" id="done-sub">Colour frames are on your canvas.</div>
     <div class="done-btns">
-      <button class="btn btn-ghost" onclick="showPick()">← Back</button>
+      <button class="btn btn-ghost" onclick="showImport()">← Import another</button>
       <button class="btn btn-primary" onclick="parent.postMessage({pluginMessage:{type:'close'}},'*')">Close plugin</button>
     </div>
   </div>
 </div>
 
-<!-- NO COLLECTIONS -->
-<div class="screen hidden" id="s-empty">
-  <div class="no-cols">
-    <div class="no-cols-icon">⬡</div>
-    <div style="font-size:13px;font-weight:500;">No colour variables found</div>
-    <div style="font-size:11px;">This file has no local variable collections with colours. Add variables in Figma's variable panel first.</div>
-  </div>
-</div>
-
 <script>
-var collections = [];
-var selected = {};
+var parsedGroups = null;
 
-// ─── Receive messages from plugin ────────────────────────────────────────────
-window.onmessage = function(e) {
-  var msg = e.data.pluginMessage;
-  if (!msg) return;
+// ─── Drop zone ────────────────────────────────────────────────────────────────
+var dz = document.getElementById('drop-zone');
+dz.addEventListener('dragover', function(e) { e.preventDefault(); dz.classList.add('over'); });
+dz.addEventListener('dragleave', function() { dz.classList.remove('over'); });
+dz.addEventListener('drop', function(e) {
+  e.preventDefault(); dz.classList.remove('over');
+  var file = e.dataTransfer.files[0];
+  if (file) readFile(file);
+});
+document.getElementById('file-input').addEventListener('change', function(e) {
+  if (e.target.files[0]) readFile(e.target.files[0]);
+});
 
-  if (msg.type === 'collections') {
-    if (msg.version) document.getElementById('version').textContent = 'Colour Variables · v' + msg.version;
-    collections = msg.data;
-    if (!collections.length) {
-      show('s-empty');
-    } else {
-      // Select all by default
-      collections.forEach(function(c) { selected[c.id] = true; });
-      renderList();
-      show('s-pick');
+function readFile(file) {
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var json = JSON.parse(e.target.result);
+      parseTokens(json, file.name);
+    } catch(err) {
+      document.getElementById('footer-note').textContent = 'Invalid JSON — ' + err.message;
     }
-  }
+  };
+  reader.readAsText(file);
+}
 
-  if (msg.type === 'progress') {
-    var pct = Math.round(((msg.step + 0.5) / msg.total) * 100);
-    document.getElementById('prog-bar').style.width = pct + '%';
-    document.getElementById('prog-sub').textContent = msg.name ? 'Building: ' + msg.name : 'Working…';
-    // Mark steps
-    var steps = document.querySelectorAll('.prog-step');
-    steps.forEach(function(s, i) {
-      s.classList.remove('active', 'done');
-      if (i < msg.step) s.classList.add('done');
-      if (i === msg.step) s.classList.add('active');
+// ─── Parse tokens ─────────────────────────────────────────────────────────────
+function parseTokens(json, filename) {
+  var groups = [];
+  var totalColors = 0;
+
+  // Walk the JSON — group by top-level key / nested path
+  function walk(obj, path) {
+    if (!obj || typeof obj !== 'object') return;
+
+    // Check if this is a token node
+    if (obj['$type'] === 'color' && obj['$value']) {
+      var val = obj['$value'];
+      var hex = val.hex || val;
+      var alpha = (val.alpha !== undefined) ? val.alpha : 1;
+
+      // Clean hex
+      if (typeof hex === 'string' && hex.startsWith('#') && hex.length >= 7) {
+        // Find or create group (all path segments except last)
+        var parts = path.split('/');
+        var groupKey = parts.length > 1 ? parts.slice(0,-1).join('/') : parts[0];
+        var tokenName = '--' + path.replace(/\//g, '-').toLowerCase();
+
+        var group = groups.find(function(g) { return g.key === groupKey; });
+        if (!group) { group = { key: groupKey, label: groupKey, tokens: [] }; groups.push(group); }
+
+        group.tokens.push({ name: tokenName, hex: hex.toUpperCase(), alpha: alpha });
+        totalColors++;
+      }
+      return;
+    }
+
+    // Skip non-color types
+    if (obj['$type'] && obj['$type'] !== 'color') return;
+
+    // Walk children
+    Object.keys(obj).forEach(function(key) {
+      if (key.startsWith('$') || key.startsWith('@')) return;
+      walk(obj[key], path ? path + '/' + key : key);
     });
   }
 
-  if (msg.type === 'debug_result') { document.getElementById('dbg').textContent = msg.text; document.getElementById('dbg').style.display='block'; }
+  walk(json, '');
+
+  if (totalColors === 0) {
+    document.getElementById('footer-note').textContent = 'No colour tokens found in this file';
+    return;
+  }
+
+  parsedGroups = groups;
+
+  // Show preview
+  document.getElementById('preview').classList.remove('hidden');
+  document.getElementById('preview-title').textContent = filename;
+  document.getElementById('preview-stats').textContent = totalColors + ' colours across ' + groups.length + ' groups';
+
+  var list = document.getElementById('group-list');
+  list.innerHTML = '';
+  groups.forEach(function(g) {
+    var row = document.createElement('div');
+    row.className = 'group-row';
+    row.innerHTML = '<span class="group-name">' + esc(g.label) + '</span>'
+      + '<span class="group-count">' + g.tokens.length + ' colour' + (g.tokens.length !== 1 ? 's' : '') + '</span>';
+    list.appendChild(row);
+  });
+
+  document.getElementById('footer-note').textContent = totalColors + ' colours ready to build';
+  document.getElementById('btn-build').disabled = false;
+}
+
+// ─── Build ────────────────────────────────────────────────────────────────────
+function startBuild() {
+  if (!parsedGroups) return;
+  show('s-progress');
+  parent.postMessage({ pluginMessage: { type: 'build', groups: parsedGroups } }, '*');
+}
+
+window.onmessage = function(e) {
+  var msg = e.data.pluginMessage;
+  if (!msg) return;
   if (msg.type === 'done') {
-    document.getElementById('prog-bar').style.width = '100%';
-    var n = Object.values(selected).filter(Boolean).length;
     document.getElementById('done-sub').textContent =
-      n + ' collection' + (n !== 1 ? 's' : '') + ' drawn on the current page.';
-    setTimeout(function() { show('s-done'); }, 400);
+      parsedGroups.length + ' group' + (parsedGroups.length !== 1 ? 's' : '') + ' drawn on the canvas.';
+    show('s-done');
   }
 };
 
-// ─── Render collection list ───────────────────────────────────────────────────
-function renderList() {
-  var list = document.getElementById('col-list');
-  list.innerHTML = '';
-  collections.forEach(function(col) {
-    var card = document.createElement('div');
-    card.className = 'col-card' + (selected[col.id] ? ' selected' : '');
-    card.innerHTML =
-      '<div class="col-check"><div class="col-check-inner"></div></div>'
-      + '<div class="col-info">'
-      + '<div class="col-name">' + esc(col.name) + '</div>'
-      + '<div class="col-meta">' + col.colorCount + ' colour' + (col.colorCount !== 1 ? 's' : '')
-      + (col.modes.length > 1 ? ' · ' + col.modes.length + ' modes' : '') + '</div>'
-      + '</div>';
-    card.onclick = function() { toggle(col.id, card); };
-    list.appendChild(card);
-  });
-  updateCount();
-}
+function showImport() { show('s-import'); }
 
-function toggle(id, card) {
-  selected[id] = !selected[id];
-  card.classList.toggle('selected', selected[id]);
-  updateCount();
-}
-
-function toggleAll() {
-  var anyOff = collections.some(function(c) { return !selected[c.id]; });
-  collections.forEach(function(c) { selected[c.id] = anyOff; });
-  document.querySelectorAll('.col-card').forEach(function(card, i) {
-    card.classList.toggle('selected', selected[collections[i].id]);
-  });
-  updateCount();
-}
-
-function updateCount() {
-  var n = collections.filter(function(c) { return selected[c.id]; }).length;
-  document.getElementById('count').textContent = n;
-  document.getElementById('btn-build').disabled = n === 0;
-}
-
-// ─── Start build ─────────────────────────────────────────────────────────────
-function startBuild() {
-  var ids = collections.filter(function(c) { return selected[c.id]; }).map(function(c) { return c.id; });
-
-  // Build progress step list
-  var stepsEl = document.getElementById('prog-steps');
-  stepsEl.innerHTML = ids.map(function(id) {
-    var col = collections.find(function(c) { return c.id === id; });
-    return '<div class="prog-step" data-id="' + id + '">'
-      + '<div class="step-dot"></div>'
-      + '<span>' + esc(col ? col.name : id) + '</span>'
-      + '</div>';
-  }).join('');
-
-  show('s-progress');
-  parent.postMessage({ pluginMessage: { type: 'build', collectionIds: ids } }, '*');
-}
-
-function runDebug() {
-  var ids = collections.filter(function(c){ return selected[c.id]; }).map(function(c){ return c.id; });
-  if (ids.length) parent.postMessage({ pluginMessage: { type: 'debug', collectionId: ids[0] } }, '*');
-}
-function showPick() { show('s-pick'); }
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 function show(id) {
-  ['s-loading','s-pick','s-progress','s-done','s-empty'].forEach(function(sid) {
-    document.getElementById(sid).classList.toggle('hidden', sid !== id);
+  ['s-import','s-progress','s-done'].forEach(function(s) {
+    document.getElementById(s).classList.toggle('hidden', s !== id);
   });
 }
+
 function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 </script>
-<div id="dbg" style="display:none;position:fixed;bottom:0;left:0;right:0;background:#111;color:#7EC8A4;font-family:monospace;font-size:9px;padding:8px;max-height:200px;overflow-y:auto;white-space:pre;z-index:999"></div></body>
+</body>
 </html>
