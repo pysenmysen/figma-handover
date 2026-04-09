@@ -209,8 +209,12 @@ function renderList() {
   });
 
   var btnAll = document.getElementById('btn-all');
-  if (hasUpdates) {
+  var allExist = items.length > 0 && items.every(function(i) { return i.exists; });
+  if (hasUpdates && allExist) {
     btnAll.textContent = 'Update all';
+    btnAll.classList.add('has-updates');
+  } else if (hasUpdates) {
+    btnAll.textContent = 'Generate & update all';
     btnAll.classList.add('has-updates');
   } else {
     btnAll.textContent = 'Generate all';

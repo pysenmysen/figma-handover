@@ -193,9 +193,50 @@ function placeFrame(frame) {
 // PRIMITIVES — uses 📋 Doc/Colour component instances
 // ══════════════════════════════════════════════════════════════════════════════
 async function buildPrimitivesFrame(col) {
-  var modeId = col.defaultModeId;
+  var OUTER_NAME = col.name; // Keep same name for findExistingFrame
+  var colComp = await figma.importComponentByKeyAsync(KEYS.colourPrimitive);
 
-  // Group by top 2 path segments
+  var outer = findExistingFrame(OUTER_NAME);
+  var isNew = !outer;
+  if (isNew) {
+    outer = figma.createFrame();
+    outer.name = OUTER_NAME;
+    figma.currentPage.appendChild(outer);
+  }
+  outer.fills = []; outer.clipsContent = false;
+  outer.layoutMode = 'HORIZONTAL'; outer.itemSpacing = 20;
+  outer.primaryAxisSizingMode = 'AUTO'; outer.counterAxisSizingMode = 'AUTO';
+
+  // Add Doc/Module only on first generate — never touch on update
+  if (isNew) {
+    try {
+      var docComp = await figma.importComponentByKeyAsync(KEYS.docModule);
+      var docInst = docComp.createInstance();
+      outer.appendChild(docInst);
+      docInst.setProperties({
+        'Epic#134:14': 'Colour',
+        'Instance/State#134:16': col.name,
+        'Purpose#134:18': 'Primitive colour tokens. Not used directly in project files — applied via semantic variables in themes/modes.',
+        'Data/content2#202:0': false
+      });
+    } catch(e) {}
+  }
+
+  // Find or create Primitives content frame (the updatable part)
+  var primContent = outer.findOne(function(n) { return n.name === 'Primitives' && n.type === 'FRAME'; });
+  if (!primContent) {
+    primContent = figma.createFrame();
+    primContent.name = 'Primitives';
+    outer.appendChild(primContent);
+  }
+  // Clear existing colour cards
+  while (primContent.children.length > 0) primContent.children[primContent.children.length-1].remove();
+  primContent.fills = []; primContent.clipsContent = false;
+  primContent.layoutMode = 'VERTICAL'; primContent.itemSpacing = 16;
+  primContent.primaryAxisSizingMode = 'AUTO'; primContent.counterAxisSizingMode = 'AUTO';
+
+  // Group tokens
+  var modeId = col.defaultModeId;
   var groups = {}, groupOrder = [];
   for (var vi = 0; vi < col.variableIds.length; vi++) {
     var v = figma.variables.getVariableById(col.variableIds[vi]);
@@ -205,49 +246,29 @@ async function buildPrimitivesFrame(col) {
     if (!res) continue;
     var parts = v.name.split('/');
     var gKey = parts.length > 1 ? parts.slice(0,2).join('/') : '__root__';
-    var gParts = parts.length > 1 ? parts.slice(0,2) : [col.name];
-    if (!groups[gKey]) { groups[gKey] = { parts: gParts, tokens: [] }; groupOrder.push(gKey); }
+    if (!groups[gKey]) { groups[gKey] = { tokens: [] }; groupOrder.push(gKey); }
     groups[gKey].tokens.push({
       cssName: '--' + v.name.replace(/\//g, '-').toLowerCase(),
-      variable: v,
-      hex: toHex(res.rgba.r, res.rgba.g, res.rgba.b),
-      alpha: Math.round(res.rgba.a * 100) / 100
+      variable: v, hex: toHex(res.rgba.r, res.rgba.g, res.rgba.b),
+      alpha: Math.round(res.rgba.a * 100) / 100,
+      r: res.rgba.r, g: res.rgba.g, b: res.rgba.b
     });
   }
 
-  var colComp = await figma.importComponentByKeyAsync(KEYS.colourPrimitive);
-
-  var outer = getOrCreateFrame(col.name);
-  outer.fills = [];
-  outer.clipsContent = false;
-  outer.layoutMode = 'VERTICAL';
-  outer.itemSpacing = 16;
-  outer.primaryAxisSizingMode = 'AUTO';
-  outer.counterAxisSizingMode = 'AUTO';
-
   for (var gi = 0; gi < groupOrder.length; gi++) {
     var g = groups[groupOrder[gi]];
-
     var gf = figma.createFrame();
-    gf.name = 'VaribleGroup';
-    gf.fills = [];
-    gf.layoutMode = 'VERTICAL';
-    gf.itemSpacing = 12;
-    gf.primaryAxisSizingMode = 'AUTO';
-    gf.counterAxisSizingMode = 'FIXED';
+    gf.name = 'VaribleGroup'; gf.fills = [];
+    gf.layoutMode = 'VERTICAL'; gf.itemSpacing = 12;
+    gf.primaryAxisSizingMode = 'AUTO'; gf.counterAxisSizingMode = 'FIXED';
     gf.layoutAlign = 'STRETCH';
-    outer.appendChild(gf);
+    primContent.appendChild(gf);
 
-    // Cards wrap
     var vf = figma.createFrame();
-    vf.name = 'Varibles';
-    vf.fills = [];
-    vf.layoutMode = 'HORIZONTAL';
-    vf.layoutWrap = 'WRAP';
-    vf.itemSpacing = 4;
-    vf.counterAxisSpacing = 4;
-    vf.primaryAxisSizingMode = 'FIXED';
-    vf.counterAxisSizingMode = 'AUTO';
+    vf.name = 'Varibles'; vf.fills = [];
+    vf.layoutMode = 'HORIZONTAL'; vf.layoutWrap = 'WRAP';
+    vf.itemSpacing = 4; vf.counterAxisSpacing = 4;
+    vf.primaryAxisSizingMode = 'FIXED'; vf.counterAxisSizingMode = 'AUTO';
     vf.layoutAlign = 'STRETCH';
     gf.appendChild(vf);
 
@@ -255,20 +276,19 @@ async function buildPrimitivesFrame(col) {
       var token = g.tokens[ti];
       var inst = colComp.createInstance();
       vf.appendChild(inst);
-
       var hasAlpha = token.alpha < 0.99;
       try {
-        var nameNode = inst.findOne(function(n) { return n.name === 'VariantName'; });
-        var hexNode  = inst.findOne(function(n) { return n.name === 'Hex'; });
-        var opNode   = inst.findOne(function(n) { return n.name === 'Opacity'; });
-        if (nameNode) nameNode.characters = token.cssName;
-        if (hexNode)  hexNode.characters  = token.hex;
-        if (opNode) { opNode.visible = hasAlpha; if (hasAlpha) opNode.characters = Math.round(token.alpha * 100) + '%'; }
+        inst.setProperties({
+          'VariantName#221:77': token.cssName,
+          'Hex#221:71': token.hex,
+          'Show Opacity#221:75': hasAlpha,
+          'Opacity#221:73': Math.round(token.alpha * 100) + '%'
+        });
       } catch(e) {}
       try {
         var colourFrame = inst.findOne(function(n) { return n.name === 'Colour'; });
         if (colourFrame) {
-          var colorFill = { type: 'SOLID', color: { r:0, g:0, b:0 }, opacity: token.alpha };
+          var colorFill = { type: 'SOLID', color: { r: token.r, g: token.g, b: token.b }, opacity: token.alpha };
           colourFrame.fills = [figma.variables.setBoundVariableForPaint(colorFill, 'color', token.variable)];
         }
       } catch(e) {}
