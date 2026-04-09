@@ -9,6 +9,8 @@ var KEYS = {
   themesTable:     '817002b1f661519a99cac808dcf221d48f672289', // 📋 Doc/Colour Property1=Default
   themesCol:       'f48bb2051c1b4c248bbc418baa56ac87e7d0a2ee', // Misc/ThemesCol Type=Default
   themesColour:    '9bebe09dc4b4b52bd9771525f9ce437ebc3f014c', // Misc/ThemesRow/Varible Type=Colour
+  gradientCard:    '6999639649f183fd91d2648853a74606c765c2b6', // 📋 Doc/Gradient Type=Default
+  effectCard:      'a5208d18e7106e3133b9c8cad9fbf2d72138864a', // 📋 Doc/Effect Type=Default
   sectionOther:    'eb7778ad03fc3564e5b9c25cdeae1743a5233402',
   sectionOption:   'fcd2f3c2808271c76d581b54e0cea7679c9fee3d',
 };
@@ -474,213 +476,205 @@ async function buildThemesFrame(col) {
 
 
 // ══════════════════════════════════════════════════════════════════════════════
-// EFFECTS & GRADIENTS
+// EFFECTS & GRADIENTS — real component instances, same pattern as primitives
 // ══════════════════════════════════════════════════════════════════════════════
-function buildStylesFrame() {
+async function buildStylesFrame() {
+  var OUTER_NAME = 'Effects & Gradients';
   var effectStyles = figma.getLocalEffectStyles();
   var paintStyles  = figma.getLocalPaintStyles();
-  var groups = {}, groupOrder = [];
 
+  // Collect gradients
+  var gradients = [];
   paintStyles.forEach(function(ps) {
-    var isGradient = ps.paints && ps.paints.some(function(p) { return p.type.indexOf('GRADIENT') !== -1; });
-    if (!isGradient) return;
-    var pparts = ps.name.split('/');
-    var pgKey = pparts[0];
-    if (!groups[pgKey]) { groups[pgKey] = { items: [] }; groupOrder.push(pgKey); }
-    groups[pgKey].items.push({ kind:'gradient', style:ps, groupName: pparts.length>1?pparts[1]:'', dirName:pparts[pparts.length-1] });
+    var isGrad = ps.paints && ps.paints.some(function(p) { return p.type.indexOf('GRADIENT') !== -1; });
+    if (!isGrad) return;
+    var parts = ps.name.split('/');
+    gradients.push({ style: ps, group: parts.length > 1 ? parts.slice(0,-1).join('/') : '', name: parts[parts.length-1] });
   });
 
+  // Collect effects
+  var effects = [];
   effectStyles.forEach(function(es) {
     if (!es.effects || !es.effects.length) return;
-    var eparts = es.name.split('/');
-    var egKey = eparts[0];
-    if (!groups[egKey]) { groups[egKey] = { items: [] }; groupOrder.push(egKey); }
-    groups[egKey].items.push({ kind:'effect', style:es, groupName:eparts.length>1?eparts[1]:'', dirName:eparts[eparts.length-1] });
+    var parts = es.name.split('/');
+    effects.push({ style: es, group: parts.length > 1 ? parts.slice(0,-1).join('/') : '', name: parts[parts.length-1] });
   });
 
-  if (!groupOrder.length) return;
+  if (!gradients.length && !effects.length) return;
 
-  var outer = getOrCreateFrame('Effects & Gradients');
+  // Import components
+  var gradComp   = await figma.importComponentByKeyAsync(KEYS.gradientCard);
+  var effectComp = await figma.importComponentByKeyAsync(KEYS.effectCard);
+
+  // Find or create outer frame
+  var outer = findExistingFrame(OUTER_NAME);
+  var isNew = !outer;
+  if (isNew) {
+    outer = figma.createFrame();
+    outer.name = OUTER_NAME;
+    figma.currentPage.appendChild(outer);
+  }
   outer.fills = []; outer.clipsContent = false;
-  outer.layoutMode = 'VERTICAL'; outer.itemSpacing = 16;
-  outer.primaryAxisSizingMode = 'AUTO';
-  outer.counterAxisSizingMode = 'FIXED';
-  outer.resize(FRAME_W, 100);
+  outer.layoutMode = 'HORIZONTAL'; outer.itemSpacing = 20;
+  if (isNew) {
+    outer.primaryAxisSizingMode = 'FIXED';
+    outer.counterAxisSizingMode = 'AUTO';
+    outer.resize(FRAME_W, 100);
+  }
 
-  groupOrder.forEach(function(gKey) {
-    var g = groups[gKey];
+  // Add Doc/Module only on first generate
+  if (isNew) {
+    try {
+      var docComp = await figma.importComponentByKeyAsync(KEYS.docModule);
+      var docInst = docComp.createInstance();
+      outer.appendChild(docInst);
+      var docProps = {
+        'Epic#134:14': 'Styles',
+        'Instance/State#134:16': 'Effects & Gradients',
+        'Purpose#134:18': 'Paint styles (gradients) and effect styles used across the project.',
+      };
+      try {
+        var dp = docInst.componentProperties;
+        Object.keys(dp).forEach(function(k) {
+          if (dp[k].type === 'BOOLEAN') {
+            var kl = k.toLowerCase();
+            if (kl.indexOf('section') !== -1 || kl.indexOf('data') !== -1) docProps[k] = false;
+            if (kl.indexOf('purpose') !== -1) docProps[k] = true;
+          }
+        });
+      } catch(e) {}
+      docInst.setProperties(docProps);
+    } catch(e) {}
+  }
+
+  // Find or create content frame
+  var content = outer.findOne(function(n) { return n.name === 'Styles' && n.type === 'FRAME'; });
+  if (!content) {
+    content = figma.createFrame();
+    content.name = 'Styles';
+    outer.appendChild(content);
+  }
+  while (content.children.length > 0) content.children[content.children.length-1].remove();
+  content.fills = []; content.clipsContent = false;
+  content.layoutMode = 'VERTICAL'; content.itemSpacing = 16;
+  content.primaryAxisSizingMode = 'AUTO';
+  content.counterAxisSizingMode = 'FIXED';
+  var contentW = FRAME_W - 320 - 20;
+  content.resize(contentW, 100);
+
+  // ── Build gradient group ────────────────────────────────────────────────────
+  if (gradients.length) {
     var gf = figma.createFrame();
-    gf.name = 'VaribleGroup'; gf.fills = [];
-    gf.layoutMode = 'VERTICAL'; gf.itemSpacing = 12;
-    gf.primaryAxisSizingMode = 'AUTO';
-    gf.counterAxisSizingMode = 'FIXED'; gf.layoutAlign = 'STRETCH';
-    outer.appendChild(gf);
+    gf.name = 'Gradients'; gf.fills = [];
+    gf.layoutMode = 'HORIZONTAL'; gf.layoutWrap = 'WRAP';
+    gf.itemSpacing = 4; gf.counterAxisSpacing = 4;
+    gf.primaryAxisSizingMode = 'FIXED'; gf.counterAxisSizingMode = 'AUTO';
+    gf.layoutAlign = 'STRETCH';
+    content.appendChild(gf);
 
-    var gnc = figma.createFrame();
-    gnc.name = 'GroupNameContainer'; gnc.fills = [];
-    gnc.layoutMode = 'HORIZONTAL'; gnc.itemSpacing = 4;
-    gnc.primaryAxisSizingMode = 'AUTO'; gnc.counterAxisSizingMode = 'AUTO';
-    gnc.layoutAlign = 'STRETCH';
-    gf.appendChild(gnc);
-    var lbl = makeText(gKey, 16, 0, 0, 0, 1);
-    lbl.textAutoResize = 'WIDTH_AND_HEIGHT';
-    gnc.appendChild(lbl);
+    for (var gi = 0; gi < gradients.length; gi++) {
+      var grad = gradients[gi];
+      var inst = gradComp.createInstance();
+      gf.appendChild(inst);
 
-    var vf = figma.createFrame();
-    vf.name = 'Varibles'; vf.fills = [];
-    vf.layoutMode = 'HORIZONTAL'; vf.layoutWrap = 'WRAP';
-    vf.itemSpacing = 4; vf.counterAxisSpacing = 4;
-    vf.primaryAxisSizingMode = 'FIXED'; vf.counterAxisSizingMode = 'AUTO';
-    vf.layoutAlign = 'STRETCH';
-    gf.appendChild(vf);
+      // children[0] = Style frame → children[1] = Style fill frame
+      try {
+        var styleFrame = inst.children[0].children[1]; // Style fill frame
+        if (styleFrame) styleFrame.fills = grad.style.paints;
+      } catch(e) {}
 
-    g.items.forEach(function(item) {
-      vf.appendChild(item.kind === 'gradient' ? buildStyleGradientCard(item) : buildStyleEffectCard(item));
-    });
-  });
+      // children[1] = NameHex → children[0] = Name → [0]=Group, [1]=StyleName
+      try {
+        var nameFrame = inst.children[1].children[0];
+        var groupT = nameFrame.children[0];
+        var styleT = nameFrame.children[1];
+        if (groupT && groupT.type === 'TEXT') groupT.characters = grad.group || ' ';
+        if (styleT && styleT.type === 'TEXT') styleT.characters = grad.name;
+      } catch(e) {}
+
+      // children[1] → children[1] = Hex+Opacity → Semantic01, Semantic02
+      try {
+        var hexFrame = inst.children[1].children[1];
+        var stops = [];
+        grad.style.paints.forEach(function(p) {
+          if (p.gradientStops) p.gradientStops.forEach(function(s) {
+            if (s.boundVariables && s.boundVariables.color) {
+              var v = figma.variables.getVariableById(s.boundVariables.color.id);
+              if (v) stops.push(v);
+            }
+          });
+        });
+        for (var si = 0; si < Math.min(stops.length, hexFrame.children.length); si++) {
+          var cellInst = hexFrame.children[si];
+          var v = stops[si];
+          // Colour fill = children[0].children[1]
+          try {
+            var colFill = cellInst.children[0].children[1];
+            var vCollection = figma.variables.getVariableCollectionById(v.variableCollectionId);
+            var modeId = vCollection ? vCollection.defaultModeId : null;
+            var raw = modeId ? v.valuesByMode[modeId] : v.valuesByMode[Object.keys(v.valuesByMode)[0]];
+            var res = raw ? resolveColor(raw, modeId) : null;
+            if (colFill && res) {
+              var cf = { type: 'SOLID', color: { r: res.rgba.r, g: res.rgba.g, b: res.rgba.b }, opacity: res.rgba.a };
+              colFill.fills = [figma.variables.setBoundVariableForPaint(cf, 'color', v)];
+            }
+          } catch(e) {}
+          // primitive text = children[1]
+          try {
+            var primT = cellInst.children[1];
+            if (primT && primT.type === 'TEXT') {
+              primT.characters = '--' + v.name.replace(/\//g, '-').toLowerCase();
+            }
+          } catch(e) {}
+        }
+      } catch(e) {}
+    }
+  }
+
+  // ── Build effects group ─────────────────────────────────────────────────────
+  if (effects.length) {
+    var ef = figma.createFrame();
+    ef.name = 'Effects'; ef.fills = [];
+    ef.layoutMode = 'HORIZONTAL'; ef.layoutWrap = 'WRAP';
+    ef.itemSpacing = 4; ef.counterAxisSpacing = 4;
+    ef.primaryAxisSizingMode = 'FIXED'; ef.counterAxisSizingMode = 'AUTO';
+    ef.layoutAlign = 'STRETCH';
+    content.appendChild(ef);
+
+    for (var ei = 0; ei < effects.length; ei++) {
+      var eff = effects[ei];
+      var einst = effectComp.createInstance();
+      ef.appendChild(einst);
+
+      // children[0] = Style frame → children[1] = Effect fill frame
+      try {
+        var effFrame = einst.children[0].children[1];
+        if (effFrame) {
+          effFrame.fills = [{ type: 'SOLID', color: { r: 0.9, g: 0.9, b: 0.9 } }];
+          effFrame.effects = eff.style.effects;
+        }
+      } catch(e) {}
+
+      // children[1] = NameHex → children[0] = Name → [0]=Type, [1]=StyleName
+      try {
+        var effNameFrame = einst.children[1].children[0];
+        var typeT = effNameFrame.children[0];
+        var nameT = effNameFrame.children[1];
+        if (typeT && typeT.type === 'TEXT') typeT.characters = eff.group || ' ';
+        if (nameT && nameT.type === 'TEXT') nameT.characters = eff.name;
+      } catch(e) {}
+
+      // children[1] → children[1] = Value text (CSS)
+      try {
+        var valT = einst.children[1].children[1];
+        if (valT && valT.type === 'TEXT') valT.characters = effectToCss(eff.style.effects) || '—';
+      } catch(e) {}
+    }
+  }
 
   placeFrame(outer);
 }
 
-function buildStyleGradientCard(item) {
-  var card = figma.createFrame();
-  card.name = 'Varible';
-  card.fills = [{type:'SOLID',color:{r:1,g:1,b:1},opacity:0.8}];
-  card.cornerRadius = 20;
-  card.layoutMode = 'HORIZONTAL'; card.itemSpacing = 12;
-  card.paddingLeft = card.paddingRight = card.paddingTop = card.paddingBottom = 16;
-  card.counterAxisAlignItems = 'CENTER';
-  card.primaryAxisSizingMode = 'FIXED'; card.counterAxisSizingMode = 'AUTO';
-  card.resize(288, 52);
-
-  var so = figma.createFrame();
-  so.name = 'Color'; so.fills = [];
-  so.layoutMode = 'VERTICAL';
-  so.paddingLeft = so.paddingRight = so.paddingTop = so.paddingBottom = 4;
-  so.strokes=[{type:'SOLID',color:{r:0,g:0,b:0},opacity:0.5}];
-  so.strokeWeight=1; so.cornerRadius=4;
-  so.primaryAxisSizingMode='FIXED'; so.counterAxisSizingMode='FIXED';
-  so.resize(52,52); so.layoutAlign='INHERIT'; so.layoutGrow=0;
-  card.appendChild(so);
-
-  var checker = figma.createFrame();
-  checker.name='BG-img'; checker.fills=[{type:'SOLID',color:{r:0.851,g:0.851,b:0.851}}];
-  checker.layoutMode='NONE'; checker.cornerRadius=2;
-  checker.layoutAlign='STRETCH'; checker.layoutGrow=1;
-  so.appendChild(checker);
-
-  var gradRect = figma.createFrame();
-  gradRect.name='Color'; gradRect.layoutMode='NONE'; gradRect.cornerRadius=2;
-  gradRect.resize(44,44);
-  try { gradRect.fills=item.style.paints; } catch(e) { gradRect.fills=[{type:'SOLID',color:{r:0.8,g:0.8,b:0.8}}]; }
-  so.appendChild(gradRect);
-  gradRect.layoutPositioning='ABSOLUTE'; gradRect.x=4; gradRect.y=4;
-
-  var nh = figma.createFrame();
-  nh.name='NameHex'; nh.fills=[];
-  nh.layoutMode='VERTICAL'; nh.itemSpacing=8;
-  nh.primaryAxisSizingMode='AUTO'; nh.counterAxisSizingMode='FIXED';
-  nh.primaryAxisAlignItems='CENTER';
-  nh.layoutGrow=1; nh.layoutAlign='STRETCH';
-  card.appendChild(nh);
-
-  var gn = figma.createFrame();
-  gn.name='GradientName'; gn.fills=[];
-  gn.layoutMode='VERTICAL'; gn.itemSpacing=0;
-  gn.primaryAxisSizingMode='AUTO'; gn.counterAxisSizingMode='FIXED';
-  gn.layoutAlign='STRETCH';
-  nh.appendChild(gn);
-
-  if (item.groupName) {
-    var grpT = makeText(item.groupName,12,0,0,0,0.5);
-    grpT.layoutAlign='STRETCH'; grpT.textAutoResize='HEIGHT';
-    gn.appendChild(grpT);
-  }
-  var dirT = makeText(item.dirName,12,0,0,0,1);
-  dirT.layoutAlign='STRETCH'; dirT.textAutoResize='HEIGHT';
-  gn.appendChild(dirT);
-
-  var varNames = getGradientVarNames(item.style);
-  if (varNames) {
-    var varT = makeText(varNames,12,0,0,0,0.5);
-    varT.letterSpacing={value:-1,unit:'PERCENT'};
-    varT.layoutAlign='STRETCH'; varT.textAutoResize='HEIGHT';
-    nh.appendChild(varT);
-  }
-  return card;
-}
-
-function buildStyleEffectCard(item) {
-  var card = figma.createFrame();
-  card.name = 'Varible';
-  card.fills=[{type:'SOLID',color:{r:1,g:1,b:1},opacity:0.8}];
-  card.cornerRadius=20;
-  card.layoutMode='HORIZONTAL'; card.itemSpacing=12;
-  card.paddingLeft=card.paddingRight=card.paddingTop=card.paddingBottom=16;
-  card.counterAxisAlignItems='CENTER';
-  card.primaryAxisSizingMode='FIXED'; card.counterAxisSizingMode='AUTO';
-  card.resize(288,52); card.layoutAlign='INHERIT';
-
-  var preview = figma.createEllipse();
-  preview.name='Preview'; preview.resize(44,44);
-  preview.fills=[{type:'SOLID',color:{r:0.9,g:0.9,b:0.9}}];
-  try { preview.effects=item.style.effects; } catch(e) {}
-  preview.layoutAlign='INHERIT'; preview.layoutGrow=0;
-  card.appendChild(preview);
-
-  var nh = figma.createFrame();
-  nh.name='NameHex'; nh.fills=[];
-  nh.layoutMode='VERTICAL'; nh.itemSpacing=8;
-  nh.primaryAxisSizingMode='AUTO'; nh.counterAxisSizingMode='FIXED';
-  nh.primaryAxisAlignItems='CENTER';
-  nh.layoutGrow=1; nh.layoutAlign='STRETCH';
-  card.appendChild(nh);
-
-  if (item.groupName) {
-    var grpT=makeText(item.groupName,12,0,0,0,0.5);
-    grpT.textAutoResize='WIDTH_AND_HEIGHT'; nh.appendChild(grpT);
-  }
-  var nameT=makeText(item.dirName,12,0,0,0,1);
-  nameT.textAutoResize='WIDTH_AND_HEIGHT'; nh.appendChild(nameT);
-
-  var cssVal=effectToCss(item.style.effects);
-  if (cssVal) {
-    var cssT=makeText(cssVal,10,0,0,0,0.5);
-    cssT.letterSpacing={value:-1,unit:'PERCENT'};
-    cssT.layoutAlign='STRETCH'; cssT.textAutoResize='HEIGHT';
-    nh.appendChild(cssT);
-  }
-  return card;
-}
-
-function getGradientVarNames(paintStyle) {
-  var names = [];
-  try {
-    paintStyle.paints.forEach(function(p) {
-      if (p.gradientStops) p.gradientStops.forEach(function(s) {
-        if (s.boundVariables && s.boundVariables.color) {
-          var v = figma.variables.getVariableById(s.boundVariables.color.id);
-          if (v) names.push('--' + v.name.replace(/\//g,'-').toLowerCase());
-        }
-      });
-    });
-  } catch(e) {}
-  return names.length ? names.join('\n') : null;
-}
-
-function effectToCss(effects) {
-  var parts = [];
-  effects.forEach(function(e) {
-    if (!e.visible) return;
-    if (e.type==='DROP_SHADOW'||e.type==='INNER_SHADOW') {
-      var c=e.color, inset=e.type==='INNER_SHADOW'?'inset ':'';
-      parts.push(inset+e.offset.x+'px '+e.offset.y+'px '+e.radius+'px rgba('+Math.round(c.r*255)+','+Math.round(c.g*255)+','+Math.round(c.b*255)+','+Math.round(c.a*100)/100+')');
-    } else if (e.type==='LAYER_BLUR'||e.type==='BACKGROUND_BLUR') {
-      parts.push('blur('+e.radius+'px)');
-    }
-  });
-  return parts.join(', ');
-}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // TYPOGRAPHY
