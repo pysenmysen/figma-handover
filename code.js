@@ -372,7 +372,7 @@ async function buildThemesFrame(col) {
       var docProps = {
         'Epic#134:14': 'Colour',
         'Instance/State#134:16': col.name,
-        'Purpose#134:18': 'Semantic colour tokens. One column per mode — colours are bound to variables.',
+        'Purpose#134:18': 'Semantic colour tokens mapped to primitives per mode. Each column must have its theme applied manually in Figma for the MCP to read the correct resolved colours — variable bindings update automatically when the theme is switched.',
       };
       // Auto-detect booleans: turn off sections, turn on purpose
       try {
