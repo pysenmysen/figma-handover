@@ -48,7 +48,7 @@ figma.showUI(__html__, { width: 480, height: 600, themeColors: true });
       name: 'Gradients',
       meta: gradCount + ' gradient styles',
       kind: 'gradients',
-      exists: !!figma.currentPage.findOne(function(n) { return n.type === 'FRAME' && n.name === 'Gradients'; })
+      exists: !!figma.currentPage.findOne(function(n) { return n.type === 'FRAME' && n.name === 'Doc/Gradients'; })
     });
   }
 
@@ -60,7 +60,7 @@ figma.showUI(__html__, { width: 480, height: 600, themeColors: true });
       name: 'Effects',
       meta: effectStyles.length + ' effect styles',
       kind: 'effects',
-      exists: !!figma.currentPage.findOne(function(n) { return n.type === 'FRAME' && n.name === 'Effects'; })
+      exists: !!figma.currentPage.findOne(function(n) { return n.type === 'FRAME' && n.name === 'Doc/Effects'; })
     });
   }
 
@@ -491,7 +491,7 @@ async function buildThemesFrame(col) {
 // GRADIENTS — real Doc/Gradient component instances
 // ══════════════════════════════════════════════════════════════════════════════
 async function buildGradientsFrame() {
-  var OUTER_NAME = 'Gradients';
+  var OUTER_NAME = 'Doc/Gradients';
   var paintStyles = figma.getLocalPaintStyles();
   var gradients = [];
   paintStyles.forEach(function(ps) {
@@ -598,7 +598,7 @@ async function buildGradientsFrame() {
 // EFFECTS — real Doc/Effect component instances
 // ══════════════════════════════════════════════════════════════════════════════
 async function buildEffectsFrame() {
-  var OUTER_NAME = 'Effects';
+  var OUTER_NAME = 'Doc/Effects';
   var effectStyles = figma.getLocalEffectStyles();
   var effects = [];
   effectStyles.forEach(function(es) {
@@ -651,11 +651,13 @@ async function buildEffectsFrame() {
   var content = outer.findOne(function(n) { return n.name === 'EffectStyles' && n.type === 'FRAME'; });
   if (!content) { content = figma.createFrame(); content.name = 'EffectStyles'; outer.appendChild(content); }
   while (content.children.length > 0) content.children[content.children.length-1].remove();
+  var effContentW = FRAME_W - 320 - 20;
   content.fills = []; content.clipsContent = false;
   content.layoutMode = 'HORIZONTAL'; content.layoutWrap = 'WRAP';
   content.itemSpacing = 4; content.counterAxisSpacing = 4;
-  content.primaryAxisSizingMode = 'FIXED'; content.counterAxisSizingMode = 'AUTO';
-  content.resize(FRAME_W - 320 - 20, 100);
+  content.resize(effContentW, 100);
+  content.primaryAxisSizingMode = 'AUTO';
+  content.counterAxisSizingMode = 'FIXED';
 
   for (var ei = 0; ei < effects.length; ei++) {
     var eff = effects[ei];
