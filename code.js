@@ -340,7 +340,7 @@ async function buildPrimitivesFrame(col) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// THEMES — column-based: SemanticSection + one Misc/ThemesCol per mode
+// THEMES — column-based using Misc/ThemesCol instances per mode
 // ══════════════════════════════════════════════════════════════════════════════
 async function buildThemesFrame(col) {
   var OUTER_NAME = 'Doc/' + col.name;
@@ -364,16 +364,15 @@ async function buildThemesFrame(col) {
     outer.resize(FRAME_W, 100);
   }
 
-  // Add Doc/Module only on first generate
   if (isNew) {
     try {
-      var docComp = await figma.importComponentByKeyAsync(KEYS.docModule);
-      var docInst = docComp.createInstance();
+      var docComp2 = await figma.importComponentByKeyAsync(KEYS.docModule);
+      var docInst = docComp2.createInstance();
       outer.appendChild(docInst);
       var docProps = {
         'Epic#134:14': 'Colour',
         'Instance/State#134:16': col.name,
-        'Purpose#134:18': 'Semantic colour tokens — references primitive variables. Switch theme on the table to preview per mode.',
+        'Purpose#134:18': 'Semantic colour tokens. Switch theme on the table to preview each mode — colours update via variable bindings.',
       };
       try {
         var dp = docInst.componentProperties;
@@ -402,8 +401,7 @@ async function buildThemesFrame(col) {
   themesContent.counterAxisSizingMode = 'FIXED';
   themesContent.resize(FRAME_W - 320 - 20, 100);
 
-  // Collect semantic tokens in order
-  var modeId = col.defaultModeId;
+  // Collect semantic tokens
   var modes = col.modes;
   var tokens = [];
   for (var vi = 0; vi < col.variableIds.length; vi++) {
@@ -416,42 +414,57 @@ async function buildThemesFrame(col) {
   var tableInst = tableComp.createInstance();
   themesContent.appendChild(tableInst);
 
-  // ── SemanticSection: fill Semantics slot with one cell per token ──────────
-  var semSection = tableInst.findOne(function(n) { return n.name === 'SemanticSection'; });
+  // ── SemanticSection: direct child[0] of tableInst ─────────────────────────
+  // Structure: SemanticSection > Semantics(SLOT) > colour cells
+  var semSection = tableInst.children[0]; // SemanticSection instance
   if (semSection) {
-    var semSlot = semSection.findOne(function(n) { return n.name === 'Semantics' && n.type === 'SLOT'; });
+    // Semantics slot is children[1] of SemanticSection (children[0]=Theme text)
+    var semSlot = null;
+    for (var ci = 0; ci < semSection.children.length; ci++) {
+      if (semSection.children[ci].type === 'SLOT') { semSlot = semSection.children[ci]; break; }
+    }
     if (semSlot) {
       while (semSlot.children.length > 0) semSlot.children[semSlot.children.length-1].remove();
       for (var ti = 0; ti < tokens.length; ti++) {
         var cssName = '--' + tokens[ti].name.replace(/\//g, '-').toLowerCase();
         var semCell = colourComp.createInstance();
         semSlot.appendChild(semCell);
+        // Variable?=false → no colour swatch for semantic column
         try { semCell.setProperties({ 'Variable?#229:95': false }); } catch(e) {}
+        // primitive text = semantic css name, direct child[1]
         try {
-          var pt = semCell.findOne(function(n) { return n.name === 'primitive'; });
-          if (pt) pt.characters = cssName;
+          var pt = semCell.children[1]; // primitive text node
+          if (pt && pt.type === 'TEXT') pt.characters = cssName;
         } catch(e) {}
       }
     }
   }
 
-  // ── Themes slot: one Misc/ThemesCol per mode ──────────────────────────────
-  var themesSlot = tableInst.findOne(function(n) { return n.name === 'Themes' && n.type === 'SLOT'; });
+  // ── Themes slot: children[1] of tableInst (the SLOT layer) ───────────────
+  var themesSlot = null;
+  for (var ci2 = 0; ci2 < tableInst.children.length; ci2++) {
+    if (tableInst.children[ci2].type === 'SLOT') { themesSlot = tableInst.children[ci2]; break; }
+  }
+
   if (themesSlot) {
     while (themesSlot.children.length > 0) themesSlot.children[themesSlot.children.length-1].remove();
+
     for (var mi = 0; mi < modes.length; mi++) {
       var mode = modes[mi];
       var modeCol = colComp.createInstance();
       themesSlot.appendChild(modeCol);
 
-      // Set theme name
+      // children[0] = Theme text, children[1] = Varibles slot
       try {
-        var tn = modeCol.findOne(function(n) { return n.name === 'Theme'; });
-        if (tn) tn.characters = mode.name;
+        var themeText = modeCol.children[0];
+        if (themeText && themeText.type === 'TEXT') themeText.characters = mode.name;
       } catch(e) {}
 
-      // Fill Varibles slot with one colour cell per token
-      var variblesSlot = modeCol.findOne(function(n) { return n.name === 'Varibles' && n.type === 'SLOT'; });
+      var variblesSlot = null;
+      for (var ci3 = 0; ci3 < modeCol.children.length; ci3++) {
+        if (modeCol.children[ci3].type === 'SLOT') { variblesSlot = modeCol.children[ci3]; break; }
+      }
+
       if (variblesSlot) {
         while (variblesSlot.children.length > 0) variblesSlot.children[variblesSlot.children.length-1].remove();
         for (var ti2 = 0; ti2 < tokens.length; ti2++) {
@@ -464,20 +477,25 @@ async function buildThemesFrame(col) {
           variblesSlot.appendChild(cell);
           try { cell.setProperties({ 'Variable?#229:95': true }); } catch(e) {}
 
-          // Set primitive name
+          // primitive text = resolved primitive name, direct child[1]
           try {
-            var primT = cell.findOne(function(n) { return n.name === 'primitive'; });
-            if (primT) primT.characters = res && res.aliasName
-              ? '--' + res.aliasName.replace(/\//g, '-').toLowerCase()
-              : (res ? toHex(res.rgba.r, res.rgba.g, res.rgba.b) : '—');
+            var primT = cell.children[1];
+            if (primT && primT.type === 'TEXT') {
+              primT.characters = res && res.aliasName
+                ? '--' + res.aliasName.replace(/\//g, '-').toLowerCase()
+                : (res ? toHex(res.rgba.r, res.rgba.g, res.rgba.b) : '—');
+            }
           } catch(e) {}
 
-          // Bind colour to variable
+          // Colour fill = child[0](Color) > child[1](Colour), bind to semantic variable
           try {
-            var colFrame = cell.findOne(function(n) { return n.name === 'Colour'; });
-            if (colFrame && res) {
-              var cf = { type: 'SOLID', color: { r: res.rgba.r, g: res.rgba.g, b: res.rgba.b }, opacity: res.rgba.a };
-              colFrame.fills = [figma.variables.setBoundVariableForPaint(cf, 'color', figma.variables.getVariableById(token.id))];
+            var colorFrame = cell.children[0]; // Color frame
+            if (colorFrame && colorFrame.children && colorFrame.children.length > 1) {
+              var colourFill = colorFrame.children[1]; // Colour frame inside Color
+              if (colourFill && res) {
+                var cf = { type: 'SOLID', color: { r: res.rgba.r, g: res.rgba.g, b: res.rgba.b }, opacity: res.rgba.a };
+                colourFill.fills = [figma.variables.setBoundVariableForPaint(cf, 'color', token)];
+              }
             }
           } catch(e) {}
         }
