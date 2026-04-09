@@ -156,16 +156,24 @@ function isSemantic(col) {
   return t > 0 && a / t > 0.5;
 }
 
-// Find existing frame — page top level + one level inside sections
-// Does NOT search deeper to avoid finding inner frames like 'Primitives' inside wrappers
+// Find existing frame by name — searches page + inside sections + inside section frames
+// Stops at depth 3 to avoid finding deeply nested frames with same name
 function findExistingFrame(name) {
+  // Direct page children
   for (var i = 0; i < figma.currentPage.children.length; i++) {
     var n = figma.currentPage.children[i];
     if (n.type === 'FRAME' && n.name === name) return n;
+    // Inside sections
     if (n.type === 'SECTION') {
       for (var j = 0; j < n.children.length; j++) {
-        var child = n.children[j];
-        if (child.type === 'FRAME' && child.name === name) return child;
+        var c = n.children[j];
+        if (c.type === 'FRAME' && c.name === name) return c;
+        // Inside section > frame (e.g. Colours/Themes/Styles > our frame)
+        if (c.type === 'FRAME' && c.children) {
+          for (var k = 0; k < c.children.length; k++) {
+            if (c.children[k].type === 'FRAME' && c.children[k].name === name) return c.children[k];
+          }
+        }
       }
     }
   }
@@ -214,9 +222,10 @@ async function buildPrimitivesFrame(col) {
   }
   outer.fills = []; outer.clipsContent = false;
   outer.layoutMode = 'HORIZONTAL'; outer.itemSpacing = 20;
-  outer.resize(FRAME_W, 100);         // set width first
-  outer.primaryAxisSizingMode = 'AUTO';  // then hug height
-  outer.counterAxisSizingMode = 'FIXED'; // keep fixed width
+  // HORIZONTAL layout: primaryAxis=WIDTH, counterAxis=HEIGHT
+  outer.primaryAxisSizingMode = 'FIXED'; // fixed width
+  outer.counterAxisSizingMode = 'AUTO';  // hug height
+  outer.resize(FRAME_W, 100); // width locked, height will hug content
 
   // Add Doc/Module only on first generate — never touch on update
   if (isNew) {
