@@ -210,7 +210,7 @@ function placeFrame(frame) {
 // PRIMITIVES — uses 📋 Doc/Colour component instances
 // ══════════════════════════════════════════════════════════════════════════════
 async function buildPrimitivesFrame(col) {
-  var OUTER_NAME = '📋 Colour/' + col.name; // Unique name, won't clash with inner frames
+  var OUTER_NAME = 'Doc/' + col.name; // Matches existing naming: Doc/Primitives, Doc/Themes
   var colComp = await figma.importComponentByKeyAsync(KEYS.colourPrimitive);
 
   var outer = findExistingFrame(OUTER_NAME);
