@@ -1271,7 +1271,7 @@ async function buildComponentTest() {
 
   try {
     // 📋 Doc/Module key from Core + Third Party Library
-    var DOC_MODULE_KEY = 'a93817862927a88188f22a46c00a95fc95f519be';
+    var DOC_MODULE_KEY = '8df1ea68f02f91062978acb1ccbab2cec2e92171'; // State=Default variant key
 
     log.push('Importing 📋 Doc/Module...');
     var component = await figma.importComponentByKeyAsync(DOC_MODULE_KEY);
