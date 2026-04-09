@@ -96,6 +96,10 @@ figma.ui.onmessage = async function(msg) {
       try { await buildColourCardTest(); }
       catch(err) { figma.ui.postMessage({ type: 'error', message: String(err) }); return; }
     }
+    if (msg.updatePrimitives) {
+      try { await updatePrimitivesFrame(); }
+      catch(err) { figma.ui.postMessage({ type: 'error', message: String(err) }); return; }
+    }
     figma.ui.postMessage({ type: 'done' });
   }
   if (msg.type === 'close') figma.closePlugin();
@@ -1461,4 +1465,156 @@ async function buildColourCardTest() {
 
   figma.currentPage.appendChild(outer);
   figma.viewport.scrollAndZoomIntoView([outer]);
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// UPDATE PRIMITIVES — targets 📋 Doc/Colour/Primitives inside the stylesheet
+// Clears Primitives child, rebuilds with 📋 Doc/Colour component instances
+// ══════════════════════════════════════════════════════════════════════════════
+async function updatePrimitivesFrame() {
+  // Find the stylesheet section
+  var section = figma.currentPage.findOne(function(n) {
+    return n.type === 'SECTION' && n.name.indexOf('Style sheet') !== -1;
+  });
+  if (!section) throw new Error('Could not find Style sheet section on this page');
+
+  // Navigate: Colours/Themes → 📋 Doc/Primitives → 📋 Doc/Colour/Primitives → Primitives
+  var coloursFrame = section.findOne(function(n) { return n.name === 'Colours/Themes'; });
+  if (!coloursFrame) throw new Error('Could not find Colours/Themes frame');
+
+  var docPrimitives = coloursFrame.findOne(function(n) { return n.name === '📋 Doc/Primitives'; });
+  if (!docPrimitives) throw new Error('Could not find 📋 Doc/Primitives frame');
+
+  var colourPrimitivesFrame = docPrimitives.findOne(function(n) { return n.name === '📋 Doc/Colour/Primitives'; });
+  if (!colourPrimitivesFrame) throw new Error('Could not find 📋 Doc/Colour/Primitives frame');
+
+  // Find the Primitives content frame (NOT the Doc/Module instance)
+  var primitivesContent = colourPrimitivesFrame.findOne(function(n) {
+    return n.name === 'Primitives' && n.type === 'FRAME';
+  });
+  if (!primitivesContent) throw new Error('Could not find Primitives content frame');
+
+  // Clear existing content
+  while (primitivesContent.children.length > 0) {
+    primitivesContent.children[primitivesContent.children.length - 1].remove();
+  }
+
+  // Import the 📋 Doc/Colour component
+  var colComp = await figma.importComponentByKeyAsync(KEYS.colourPrimitive);
+
+  // Get primitive collections
+  var collections = figma.variables.getLocalVariableCollections();
+  var primCol = null;
+  for (var ci = 0; ci < collections.length; ci++) {
+    if (!isSemantic(collections[ci])) { primCol = collections[ci]; break; }
+  }
+  if (!primCol) throw new Error('No primitive collection found');
+
+  var modeId = primCol.defaultModeId;
+
+  // Group tokens by top 2 path segments
+  var groups = {}, groupOrder = [];
+  for (var vi = 0; vi < primCol.variableIds.length; vi++) {
+    var v = figma.variables.getVariableById(primCol.variableIds[vi]);
+    if (!v || v.resolvedType !== 'COLOR') continue;
+    var raw = v.valuesByMode[modeId] || v.valuesByMode[Object.keys(v.valuesByMode)[0]];
+    var res = raw ? resolveColor(raw, modeId) : null;
+    if (!res) continue;
+
+    var parts = v.name.split('/');
+    var gKey = parts.length > 1 ? parts.slice(0,2).join('/') : '__root__';
+    var gParts = parts.length > 1 ? parts.slice(0,2) : [primCol.name];
+    if (!groups[gKey]) { groups[gKey] = { parts: gParts, tokens: [] }; groupOrder.push(gKey); }
+    groups[gKey].tokens.push({
+      cssName: '--' + v.name.replace(/\//g, '-').toLowerCase(),
+      variable: v,
+      hex: toHex(res.rgba.r, res.rgba.g, res.rgba.b),
+      alpha: Math.round(res.rgba.a * 100) / 100
+    });
+  }
+
+  // Build one VaribleGroup per group
+  for (var gi = 0; gi < groupOrder.length; gi++) {
+    var g = groups[groupOrder[gi]];
+
+    // VaribleGroup: column, 12px gap, fill
+    var gf = figma.createFrame();
+    gf.name = 'VaribleGroup';
+    gf.fills = [];
+    gf.layoutMode = 'VERTICAL';
+    gf.itemSpacing = 12;
+    gf.primaryAxisSizingMode = 'AUTO';
+    gf.counterAxisSizingMode = 'FIXED';
+    gf.layoutAlign = 'STRETCH';
+    primitivesContent.appendChild(gf);
+
+    // Group name label
+    var gnc = figma.createFrame();
+    gnc.name = 'GroupNameContainer';
+    gnc.fills = [];
+    gnc.layoutMode = 'HORIZONTAL';
+    gnc.itemSpacing = 4;
+    gnc.primaryAxisSizingMode = 'AUTO';
+    gnc.counterAxisSizingMode = 'AUTO';
+    gf.appendChild(gnc);
+
+    for (var pi = 0; pi < g.parts.length; pi++) {
+      var pt = makeText(g.parts[pi], 16, 0, 0, 0, 1);
+      pt.textAutoResize = 'WIDTH_AND_HEIGHT';
+      gnc.appendChild(pt);
+      if (pi < g.parts.length - 1) {
+        var sep = makeText('/', 16, 0, 0, 0, 1);
+        sep.textAutoResize = 'WIDTH_AND_HEIGHT';
+        gnc.appendChild(sep);
+      }
+    }
+
+    // Varibles wrap: row, wrap, fill, 4px gap
+    var vf = figma.createFrame();
+    vf.name = 'Varibles';
+    vf.fills = [];
+    vf.layoutMode = 'HORIZONTAL';
+    vf.layoutWrap = 'WRAP';
+    vf.itemSpacing = 4;
+    vf.counterAxisSpacing = 4;
+    vf.primaryAxisSizingMode = 'FIXED';
+    vf.counterAxisSizingMode = 'AUTO';
+    vf.layoutAlign = 'STRETCH';
+    gf.appendChild(vf);
+
+    // One 📋 Doc/Colour instance per token
+    for (var ti = 0; ti < g.tokens.length; ti++) {
+      var token = g.tokens[ti];
+      var inst = colComp.createInstance();
+      vf.appendChild(inst);
+
+      var hasAlpha = token.alpha < 0.99;
+
+      // Set text nodes
+      try {
+        var nameNode = inst.findOne(function(n) { return n.name === 'VariantName'; });
+        var hexNode  = inst.findOne(function(n) { return n.name === 'Hex'; });
+        var opNode   = inst.findOne(function(n) { return n.name === 'Opacity'; });
+        if (nameNode) nameNode.characters = token.cssName;
+        if (hexNode)  hexNode.characters  = token.hex;
+        if (opNode) {
+          opNode.visible = hasAlpha;
+          if (hasAlpha) opNode.characters = Math.round(token.alpha * 100) + '%';
+        }
+      } catch(e) {}
+
+      // Bind colour variable to Colour fill frame
+      try {
+        var colourFrame = inst.findOne(function(n) { return n.name === 'Colour'; });
+        if (colourFrame) {
+          var colorFill = { type: 'SOLID', color: { r: 0, g: 0, b: 0 }, opacity: token.alpha };
+          var bf = figma.variables.setBoundVariableForPaint(colorFill, 'color', token.variable);
+          colourFrame.fills = [bf];
+        }
+      } catch(e) {}
+    }
+  }
+
+  figma.viewport.scrollAndZoomIntoView([colourPrimitivesFrame]);
 }
