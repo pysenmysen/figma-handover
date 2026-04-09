@@ -88,6 +88,10 @@ figma.ui.onmessage = async function(msg) {
       try { await buildStyleTest(); }
       catch(err) { figma.ui.postMessage({ type: 'error', message: String(err) }); return; }
     }
+    if (msg.buildComponentTest) {
+      try { await buildComponentTest(); }
+      catch(err) { figma.ui.postMessage({ type: 'error', message: String(err) }); return; }
+    }
     figma.ui.postMessage({ type: 'done' });
   }
   if (msg.type === 'close') figma.closePlugin();
@@ -1236,6 +1240,88 @@ async function buildStyleTest() {
     rt.fills = [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 } }];
     rt.textAutoResize = 'WIDTH_AND_HEIGHT';
     outer.appendChild(rt);
+  }
+
+  figma.currentPage.appendChild(outer);
+  figma.viewport.scrollAndZoomIntoView([outer]);
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MINI TEST — component instance via importComponentByKeyAsync
+// ══════════════════════════════════════════════════════════════════════════════
+async function buildComponentTest() {
+  figma.currentPage.findAll(function(n) {
+    return n.type === 'FRAME' && n.name === '◈ Component Test';
+  }).forEach(function(f) { f.remove(); });
+
+  var outer = figma.createFrame();
+  outer.name = '◈ Component Test';
+  outer.fills = [];
+  outer.layoutMode = 'VERTICAL';
+  outer.itemSpacing = 16;
+  outer.paddingLeft = outer.paddingRight = outer.paddingTop = outer.paddingBottom = 24;
+  outer.primaryAxisSizingMode = 'AUTO';
+  outer.counterAxisSizingMode = 'AUTO';
+  outer.clipsContent = false;
+
+  await figma.loadFontAsync({ family: 'Inter', style: 'Regular' });
+
+  var log = [];
+
+  try {
+    // 📋 Doc/Module key from Core + Third Party Library
+    var DOC_MODULE_KEY = 'a93817862927a88188f22a46c00a95fc95f519be';
+
+    log.push('Importing 📋 Doc/Module...');
+    var component = await figma.importComponentByKeyAsync(DOC_MODULE_KEY);
+    log.push('✓ Component imported: ' + component.name);
+
+    // Create instance
+    var instance = component.createInstance();
+    instance.name = 'Test Doc Panel';
+    outer.appendChild(instance);
+    log.push('✓ Instance created');
+
+    // Try setting component properties
+    try {
+      var props = instance.componentProperties;
+      var propNames = Object.keys(props);
+      log.push('Component properties (' + propNames.length + '):');
+      for (var i = 0; i < propNames.length; i++) {
+        log.push('  · ' + propNames[i] + ' = ' + JSON.stringify(props[propNames[i]].value));
+      }
+
+      // Try setting Epic and Instance text properties
+      var setProps = {};
+      for (var j = 0; j < propNames.length; j++) {
+        var n = propNames[j];
+        if (n.startsWith('Epic')) setProps[n] = 'Colour';
+        if (n.startsWith('Instance')) setProps[n] = 'Primitives';
+        if (n.startsWith('Purpose')) setProps[n] = 'Primitive colour tokens — base palette only, used via semantic variables';
+      }
+      if (Object.keys(setProps).length > 0) {
+        instance.setProperties(setProps);
+        log.push('✓ Properties set successfully!');
+      }
+    } catch(e) {
+      log.push('⚠ setProperties failed: ' + String(e));
+    }
+
+  } catch(e) {
+    log.push('✗ Failed: ' + String(e));
+    log.push('  → Is Core + Third Party Library enabled in this file?');
+  }
+
+  // Log output
+  for (var ri = 0; ri < log.length; ri++) {
+    var t = figma.createText();
+    try { t.fontName = { family: 'Inter', style: 'Regular' }; } catch(e) {}
+    t.fontSize = 11;
+    t.characters = log[ri] || ' ';
+    t.fills = [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 } }];
+    t.textAutoResize = 'WIDTH_AND_HEIGHT';
+    outer.appendChild(t);
   }
 
   figma.currentPage.appendChild(outer);
