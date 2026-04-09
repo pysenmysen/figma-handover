@@ -347,6 +347,14 @@ async function buildTypography() {
           var row = drComp.createInstance();
           dpSlot.appendChild(row);
 
+          // Hide DataSource and Required
+          try {
+            row.setProperties({
+              'Show DataSource#237:108': false,
+              'Required#134:10':         false,
+            });
+          } catch(e) {}
+
           var dpT = row.findOne(function(n) { return n.name === 'Datapoint' && n.type === 'TEXT'; });
           var vrT = row.findOne(function(n) { return n.name === 'Value/rule' && n.type === 'TEXT'; });
           if (dpT) { try { dpT.characters = 'Font family'; } catch(e) {} }
@@ -359,6 +367,7 @@ async function buildTypography() {
     var stylesCol = figma.createFrame();
     stylesCol.name = 'TextStyles'; stylesCol.fills = [];
     stylesCol.layoutMode = 'VERTICAL'; stylesCol.itemSpacing = 4;
+    stylesCol.resize(FRAME_W - 320 - 16, 100); // 1168px explicit before FIXED mode
     stylesCol.primaryAxisSizingMode = 'AUTO'; stylesCol.counterAxisSizingMode = 'FIXED';
     stylesCol.layoutGrow = 1; stylesCol.layoutAlign = 'INHERIT';
     secRow.appendChild(stylesCol);
@@ -366,6 +375,7 @@ async function buildTypography() {
     for (var si = 0; si < g.styles.length; si++) {
       var style = g.styles[si];
       var inst = typoComp.createInstance();
+      inst.layoutAlign = 'STRETCH';
       stylesCol.appendChild(inst);
 
       var styleName = style.name.split('/').pop();
