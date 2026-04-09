@@ -326,10 +326,7 @@ async function buildTypography() {
 
     // Populate Sections slot → Slots/Datapoints → DataRow for Font family
     try {
-      var sectionsSlot = null;
-      for (var ci = 0; ci < docInst.children.length; ci++) {
-        if (docInst.children[ci].name === 'Sections') { sectionsSlot = docInst.children[ci]; break; }
-      }
+      var sectionsSlot = docInst.findOne(function(n) { return n.name === 'Sections'; });
       if (sectionsSlot) {
         while (sectionsSlot.children.length > 0) sectionsSlot.children[sectionsSlot.children.length - 1].remove();
 
@@ -337,10 +334,7 @@ async function buildTypography() {
         sectionsSlot.appendChild(dpInst);
 
         // Find Datapoints slot within Slots/Datapoints
-        var dpSlot = null;
-        for (var di = 0; di < dpInst.children.length; di++) {
-          if (dpInst.children[di].name === 'Datapoints') { dpSlot = dpInst.children[di]; break; }
-        }
+        var dpSlot = dpInst.findOne(function(n) { return n.name === 'Datapoints'; });
         if (dpSlot) {
           while (dpSlot.children.length > 0) dpSlot.children[dpSlot.children.length - 1].remove();
 
@@ -393,7 +387,7 @@ async function buildTypography() {
       try {
         inst.setProperties({
           'Type':                  variantType,
-          'Style name#237:106':    styleName,
+          'Style name#238:110':    styleName,
           'Font-size#205:43':      fs,
           'Line-height#205:47':    lh,
           'Weight#205:51':         wt,
