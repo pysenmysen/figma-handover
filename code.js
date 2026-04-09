@@ -223,8 +223,7 @@ async function buildPrimitivesFrame(col) {
   outer.layoutMode = 'VERTICAL';
   outer.itemSpacing = 16;
   outer.primaryAxisSizingMode = 'AUTO';
-  outer.counterAxisSizingMode = 'FIXED';
-  outer.resize(FRAME_W, 100);
+  outer.counterAxisSizingMode = 'AUTO';
 
   for (var gi = 0; gi < groupOrder.length; gi++) {
     var g = groups[groupOrder[gi]];
@@ -300,9 +299,8 @@ function buildThemesFrame(col) {
   outer.clipsContent = false;
   outer.layoutMode = 'HORIZONTAL';
   outer.itemSpacing = 4;
-  outer.primaryAxisSizingMode = 'FIXED';
+  outer.primaryAxisSizingMode = 'AUTO';
   outer.counterAxisSizingMode = 'AUTO';
-  outer.resize(FRAME_W, 100);
 
   // Semantic column
   var semCol = figma.createFrame();
