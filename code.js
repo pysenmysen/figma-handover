@@ -1162,7 +1162,6 @@ function buildSpecPill(parent, label, value) {
 // Tests if library text styles can be applied to generated text nodes
 // ══════════════════════════════════════════════════════════════════════════════
 async function buildStyleTest() {
-  // Remove existing test frame
   figma.currentPage.findAll(function(n) {
     return n.type === 'FRAME' && n.name === '◈ Style Test';
   }).forEach(function(f) { f.remove(); });
@@ -1177,50 +1176,62 @@ async function buildStyleTest() {
   outer.primaryAxisSizingMode = 'AUTO';
   outer.counterAxisSizingMode = 'AUTO';
 
+  await figma.loadFontAsync({ family: 'Inter', style: 'Regular' });
+
   var results = [];
+  var importedStyle = null;
 
-  // ── Attempt 1: find style by name in local styles ──────────────────────
-  var localStyles = figma.getLocalTextStyles();
-  var handoverStyle = null;
-  for (var i = 0; i < localStyles.length; i++) {
-    if (localStyles[i].name === '📋 Handover/12_100') {
-      handoverStyle = localStyles[i];
-      break;
+  // ── Attempt 1: getAvailableSharedStylesAsync (requires teamlibrary permission) ──
+  try {
+    var sharedStyles = await figma.teamLibrary.getAvailableSharedStylesAsync('TEXT');
+    results.push('✓ teamLibrary API works — found ' + sharedStyles.length + ' shared text styles');
+
+    // Find 📋 Handover/12_100
+    var target = null;
+    for (var i = 0; i < sharedStyles.length; i++) {
+      results.push('  · ' + sharedStyles[i].name + ' [' + sharedStyles[i].key + ']');
+      if (sharedStyles[i].name === '📋 Handover/12_100') target = sharedStyles[i];
     }
-  }
 
-  if (handoverStyle) {
-    results.push('✓ Found local style: ' + handoverStyle.name + ' (id: ' + handoverStyle.id + ')');
-    // Create text with style applied
-    try {
-      await figma.loadFontAsync(handoverStyle.fontName);
-      var t1 = figma.createText();
-      t1.fontName = handoverStyle.fontName;
-      t1.characters = 'Hello it might work — via local style lookup';
-      t1.textStyleId = handoverStyle.id;
-      t1.fills = [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 } }];
-      outer.appendChild(t1);
-      results.push('✓ textStyleId applied successfully');
-    } catch(e) { results.push('✗ Failed to apply style: ' + e); }
-  } else {
-    results.push('✗ Style not found locally (' + localStyles.length + ' local styles total)');
-    results.push('  → Core Library may not be enabled in this file');
-  }
+    if (target) {
+      results.push('');
+      results.push('✓ Found target style: ' + target.name);
+      results.push('  key: ' + target.key);
 
-  // ── Attempt 2: list ALL local text styles ──────────────────────────────
-  results.push('');
-  results.push('Local text styles found (' + localStyles.length + '):');
-  for (var j = 0; j < Math.min(localStyles.length, 10); j++) {
-    results.push('  · ' + localStyles[j].name);
+      // Import and apply
+      try {
+        importedStyle = await figma.importStyleByKeyAsync(target.key);
+        results.push('✓ importStyleByKeyAsync succeeded!');
+        results.push('  id: ' + importedStyle.id);
+
+        // Create "Hello it might work" with this style
+        await figma.loadFontAsync(importedStyle.fontName);
+        var hello = figma.createText();
+        hello.fontName = importedStyle.fontName;
+        hello.characters = 'Hello it might work!';
+        hello.textStyleId = importedStyle.id;
+        hello.fills = [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 } }];
+        hello.textAutoResize = 'WIDTH_AND_HEIGHT';
+        outer.appendChild(hello);
+
+        results.push('✓ Text node created with library style applied!');
+        results.push('  Check the text node — it should show "📋 Handover/12_100" in the panel');
+      } catch(e) {
+        results.push('✗ importStyleByKeyAsync failed: ' + String(e));
+      }
+    } else {
+      results.push('✗ 📋 Handover/12_100 not found in shared styles');
+    }
+  } catch(e) {
+    results.push('✗ teamLibrary API failed: ' + String(e));
+    results.push('  → Check manifest.json has "teamlibrary" permission');
   }
-  if (localStyles.length > 10) results.push('  ... and ' + (localStyles.length - 10) + ' more');
 
   // ── Report ──────────────────────────────────────────────────────────────
-  await figma.loadFontAsync({ family: 'Inter', style: 'Regular' });
   for (var ri = 0; ri < results.length; ri++) {
     var rt = figma.createText();
     try { rt.fontName = { family: 'Inter', style: 'Regular' }; } catch(e) {}
-    rt.fontSize = 12;
+    rt.fontSize = 11;
     rt.characters = results[ri] || ' ';
     rt.fills = [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 } }];
     rt.textAutoResize = 'WIDTH_AND_HEIGHT';
