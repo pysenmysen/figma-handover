@@ -1251,10 +1251,14 @@ async function buildStyleTest() {
 // MINI TEST — component instance via importComponentByKeyAsync
 // ══════════════════════════════════════════════════════════════════════════════
 // Component + slot keys from Core + Third Party Library
+// All component keys from Core + Third Party Library
 var KEYS = {
-  docModule:    '8df1ea68f02f91062978acb1ccbab2cec2e92171', // 📋 Doc/Module State=Default
-  sectionOther: 'eb7778ad03fc3564e5b9c25cdeae1743a5233402', // Handover/Section/Other State=Default
+  docModule:       '8df1ea68f02f91062978acb1ccbab2cec2e92171', // 📋 Doc/Module State=Default
+  sectionOther:    'eb7778ad03fc3564e5b9c25cdeae1743a5233402', // Handover/Section/Other
+  sectionOption:   'fcd2f3c2808271c76d581b54e0cea7679c9fee3d', // Handover/Section/Option
 };
+// Section title property name (found from mini test)
+var SECTION_TITLE_PROP = 'Section title#134:20';
 
 async function buildComponentTest() {
   figma.currentPage.findAll(function(n) {
