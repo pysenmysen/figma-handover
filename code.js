@@ -156,14 +156,17 @@ function isSemantic(col) {
   return t > 0 && a / t > 0.5;
 }
 
+var savedPositions = {};
 function removeFrame(name) {
   figma.currentPage.findAll(function(n) {
     return n.type === 'FRAME' && n.name === name;
-  }).forEach(function(f) { f.remove(); });
+  }).forEach(function(f) {
+    savedPositions[name] = { x: f.x, y: f.y };
+    f.remove();
+  });
 }
 
 function placeFrame(frame) {
-  // Place inside ✏️ Style sheet section if it exists, else on canvas
   var section = figma.currentPage.findOne(function(n) {
     return n.type === 'SECTION' && n.name.indexOf('Style sheet') !== -1;
   });
@@ -171,6 +174,11 @@ function placeFrame(frame) {
     section.appendChild(frame);
   } else {
     figma.currentPage.appendChild(frame);
+    // Restore position if we had one saved
+    if (savedPositions[frame.name]) {
+      frame.x = savedPositions[frame.name].x;
+      frame.y = savedPositions[frame.name].y;
+    }
   }
   figma.viewport.scrollAndZoomIntoView([frame]);
 }
@@ -228,27 +236,6 @@ async function buildPrimitivesFrame(col) {
     gf.counterAxisSizingMode = 'FIXED';
     gf.layoutAlign = 'STRETCH';
     outer.appendChild(gf);
-
-    // Group label
-    var gnc = figma.createFrame();
-    gnc.name = 'GroupNameContainer';
-    gnc.fills = [];
-    gnc.layoutMode = 'HORIZONTAL';
-    gnc.itemSpacing = 4;
-    gnc.primaryAxisSizingMode = 'AUTO';
-    gnc.counterAxisSizingMode = 'AUTO';
-    gf.appendChild(gnc);
-
-    for (var pi = 0; pi < g.parts.length; pi++) {
-      var pt = makeText(g.parts[pi], 16, 0, 0, 0, 1);
-      pt.textAutoResize = 'WIDTH_AND_HEIGHT';
-      gnc.appendChild(pt);
-      if (pi < g.parts.length - 1) {
-        var sp = makeText('/', 16, 0, 0, 0, 1);
-        sp.textAutoResize = 'WIDTH_AND_HEIGHT';
-        gnc.appendChild(sp);
-      }
-    }
 
     // Cards wrap
     var vf = figma.createFrame();
