@@ -206,6 +206,7 @@ async function buildPrimitivesFrame(col) {
   outer.fills = []; outer.clipsContent = false;
   outer.layoutMode = 'HORIZONTAL'; outer.itemSpacing = 20;
   outer.primaryAxisSizingMode = 'AUTO'; outer.counterAxisSizingMode = 'AUTO';
+  outer.resize(FRAME_W, 100); // width needed so inner wrap knows where to break
 
   // Add Doc/Module only on first generate — never touch on update
   if (isNew) {
@@ -233,7 +234,10 @@ async function buildPrimitivesFrame(col) {
   while (primContent.children.length > 0) primContent.children[primContent.children.length-1].remove();
   primContent.fills = []; primContent.clipsContent = false;
   primContent.layoutMode = 'VERTICAL'; primContent.itemSpacing = 16;
-  primContent.primaryAxisSizingMode = 'AUTO'; primContent.counterAxisSizingMode = 'AUTO';
+  primContent.primaryAxisSizingMode = 'AUTO';
+  primContent.counterAxisSizingMode = 'FIXED';
+  primContent.layoutGrow = 1;  // fill remaining width after Doc/Module
+  primContent.layoutAlign = 'INHERIT';
 
   // Group tokens
   var modeId = col.defaultModeId;
