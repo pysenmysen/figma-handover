@@ -156,30 +156,36 @@ function isSemantic(col) {
   return t > 0 && a / t > 0.5;
 }
 
-var savedPositions = {};
-function removeFrame(name) {
-  figma.currentPage.findAll(function(n) {
+// Find existing frame anywhere on the page (including inside sections)
+function findExistingFrame(name) {
+  return figma.currentPage.findOne(function(n) {
     return n.type === 'FRAME' && n.name === name;
-  }).forEach(function(f) {
-    savedPositions[name] = { x: f.x, y: f.y };
-    f.remove();
   });
 }
 
-function placeFrame(frame) {
-  var section = figma.currentPage.findOne(function(n) {
-    return n.type === 'SECTION' && n.name.indexOf('Style sheet') !== -1;
-  });
-  if (section) {
-    section.appendChild(frame);
-  } else {
-    figma.currentPage.appendChild(frame);
-    // Restore position if we had one saved
-    if (savedPositions[frame.name]) {
-      frame.x = savedPositions[frame.name].x;
-      frame.y = savedPositions[frame.name].y;
-    }
+// Clear all children from a frame
+function clearFrame(frame) {
+  while (frame.children.length > 0) {
+    frame.children[frame.children.length - 1].remove();
   }
+}
+
+// Get or create a frame — if exists, clear in place (preserves position/parent)
+// If new, create and place on canvas
+function getOrCreateFrame(name) {
+  var existing = findExistingFrame(name);
+  if (existing) {
+    clearFrame(existing);
+    return existing;
+  }
+  var frame = figma.createFrame();
+  frame.name = name;
+  figma.currentPage.appendChild(frame);
+  return frame;
+}
+
+function placeFrame(frame) {
+  // Already in place — just scroll to it
   figma.viewport.scrollAndZoomIntoView([frame]);
 }
 
@@ -187,7 +193,6 @@ function placeFrame(frame) {
 // PRIMITIVES — uses 📋 Doc/Colour component instances
 // ══════════════════════════════════════════════════════════════════════════════
 async function buildPrimitivesFrame(col) {
-  removeFrame(col.name);
   var modeId = col.defaultModeId;
 
   // Group by top 2 path segments
@@ -210,12 +215,9 @@ async function buildPrimitivesFrame(col) {
     });
   }
 
-  // Import colour card component
   var colComp = await figma.importComponentByKeyAsync(KEYS.colourPrimitive);
 
-  // Outer frame
-  var outer = figma.createFrame();
-  outer.name = col.name;
+  var outer = getOrCreateFrame(col.name);
   outer.fills = [];
   outer.clipsContent = false;
   outer.layoutMode = 'VERTICAL';
@@ -281,7 +283,6 @@ async function buildPrimitivesFrame(col) {
 // THEMES
 // ══════════════════════════════════════════════════════════════════════════════
 function buildThemesFrame(col) {
-  removeFrame(col.name);
   var modes = col.modes;
   var groups = {}, groupOrder = [];
 
@@ -294,8 +295,7 @@ function buildThemesFrame(col) {
     groups[gKey].tokens.push(v);
   }
 
-  var outer = figma.createFrame();
-  outer.name = col.name;
+  var outer = getOrCreateFrame(col.name);
   outer.fills = [];
   outer.clipsContent = false;
   outer.layoutMode = 'HORIZONTAL';
@@ -442,7 +442,6 @@ function buildThemeModeCard(variable, res, primary) {
 // EFFECTS & GRADIENTS
 // ══════════════════════════════════════════════════════════════════════════════
 function buildStylesFrame() {
-  removeFrame('Effects & Gradients');
   var effectStyles = figma.getLocalEffectStyles();
   var paintStyles  = figma.getLocalPaintStyles();
   var groups = {}, groupOrder = [];
@@ -466,8 +465,7 @@ function buildStylesFrame() {
 
   if (!groupOrder.length) return;
 
-  var outer = figma.createFrame();
-  outer.name = 'Effects & Gradients';
+  var outer = getOrCreateFrame('Effects & Gradients');
   outer.fills = []; outer.clipsContent = false;
   outer.layoutMode = 'VERTICAL'; outer.itemSpacing = 16;
   outer.primaryAxisSizingMode = 'AUTO';
@@ -653,7 +651,6 @@ function effectToCss(effects) {
 // TYPOGRAPHY
 // ══════════════════════════════════════════════════════════════════════════════
 function buildTypography() {
-  removeFrame('Typography');
   var textStyles = figma.getLocalTextStyles();
   if (!textStyles.length) return;
 
@@ -664,8 +661,7 @@ function buildTypography() {
     groups[gKey].styles.push(s);
   });
 
-  var outer = figma.createFrame();
-  outer.name = 'Typography';
+  var outer = getOrCreateFrame('Typography');
   outer.fills=[]; outer.clipsContent=false;
   outer.layoutMode='VERTICAL'; outer.itemSpacing=16;
   outer.primaryAxisSizingMode='AUTO';
