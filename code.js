@@ -84,6 +84,10 @@ figma.ui.onmessage = async function(msg) {
       try { buildTypography(); }
       catch(err) { figma.ui.postMessage({ type: 'error', message: String(err) }); return; }
     }
+    if (msg.buildStyleTest) {
+      try { await buildStyleTest(); }
+      catch(err) { figma.ui.postMessage({ type: 'error', message: String(err) }); return; }
+    }
     figma.ui.postMessage({ type: 'done' });
   }
   if (msg.type === 'close') figma.closePlugin();
@@ -1148,7 +1152,81 @@ function buildSpecPill(parent, label, value) {
   pill.appendChild(lT);
 
   var vT = makeText(value, 10, 0, 0, 0, 1);
-  vT.fontWeight = 700;
   vT.textAutoResize = 'WIDTH_AND_HEIGHT';
   pill.appendChild(vT);
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MINI TEST — importStyleByKeyAsync
+// Tests if library text styles can be applied to generated text nodes
+// ══════════════════════════════════════════════════════════════════════════════
+async function buildStyleTest() {
+  // Remove existing test frame
+  figma.currentPage.findAll(function(n) {
+    return n.type === 'FRAME' && n.name === '◈ Style Test';
+  }).forEach(function(f) { f.remove(); });
+
+  var outer = figma.createFrame();
+  outer.name = '◈ Style Test';
+  outer.fills = [{ type: 'SOLID', color: { r: 0.95, g: 0.95, b: 0.95 } }];
+  outer.cornerRadius = 20;
+  outer.layoutMode = 'VERTICAL';
+  outer.itemSpacing = 16;
+  outer.paddingLeft = outer.paddingRight = outer.paddingTop = outer.paddingBottom = 24;
+  outer.primaryAxisSizingMode = 'AUTO';
+  outer.counterAxisSizingMode = 'AUTO';
+
+  var results = [];
+
+  // ── Attempt 1: find style by name in local styles ──────────────────────
+  var localStyles = figma.getLocalTextStyles();
+  var handoverStyle = null;
+  for (var i = 0; i < localStyles.length; i++) {
+    if (localStyles[i].name === '📋 Handover/12_100') {
+      handoverStyle = localStyles[i];
+      break;
+    }
+  }
+
+  if (handoverStyle) {
+    results.push('✓ Found local style: ' + handoverStyle.name + ' (id: ' + handoverStyle.id + ')');
+    // Create text with style applied
+    try {
+      await figma.loadFontAsync(handoverStyle.fontName);
+      var t1 = figma.createText();
+      t1.fontName = handoverStyle.fontName;
+      t1.characters = 'Hello it might work — via local style lookup';
+      t1.textStyleId = handoverStyle.id;
+      t1.fills = [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 } }];
+      outer.appendChild(t1);
+      results.push('✓ textStyleId applied successfully');
+    } catch(e) { results.push('✗ Failed to apply style: ' + e); }
+  } else {
+    results.push('✗ Style not found locally (' + localStyles.length + ' local styles total)');
+    results.push('  → Core Library may not be enabled in this file');
+  }
+
+  // ── Attempt 2: list ALL local text styles ──────────────────────────────
+  results.push('');
+  results.push('Local text styles found (' + localStyles.length + '):');
+  for (var j = 0; j < Math.min(localStyles.length, 10); j++) {
+    results.push('  · ' + localStyles[j].name);
+  }
+  if (localStyles.length > 10) results.push('  ... and ' + (localStyles.length - 10) + ' more');
+
+  // ── Report ──────────────────────────────────────────────────────────────
+  await figma.loadFontAsync({ family: 'Inter', style: 'Regular' });
+  for (var ri = 0; ri < results.length; ri++) {
+    var rt = figma.createText();
+    try { rt.fontName = { family: 'Inter', style: 'Regular' }; } catch(e) {}
+    rt.fontSize = 12;
+    rt.characters = results[ri] || ' ';
+    rt.fills = [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 } }];
+    rt.textAutoResize = 'WIDTH_AND_HEIGHT';
+    outer.appendChild(rt);
+  }
+
+  figma.currentPage.appendChild(outer);
+  figma.viewport.scrollAndZoomIntoView([outer]);
 }
