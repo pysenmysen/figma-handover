@@ -1250,6 +1250,12 @@ async function buildStyleTest() {
 // ══════════════════════════════════════════════════════════════════════════════
 // MINI TEST — component instance via importComponentByKeyAsync
 // ══════════════════════════════════════════════════════════════════════════════
+// Component + slot keys from Core + Third Party Library
+var KEYS = {
+  docModule:    '8df1ea68f02f91062978acb1ccbab2cec2e92171', // 📋 Doc/Module State=Default
+  sectionOther: 'eb7778ad03fc3564e5b9c25cdeae1743a5233402', // Handover/Section/Other State=Default
+};
+
 async function buildComponentTest() {
   figma.currentPage.findAll(function(n) {
     return n.type === 'FRAME' && n.name === '◈ Component Test';
@@ -1270,47 +1276,64 @@ async function buildComponentTest() {
   var log = [];
 
   try {
-    // 📋 Doc/Module key from Core + Third Party Library
-    var DOC_MODULE_KEY = '8df1ea68f02f91062978acb1ccbab2cec2e92171'; // State=Default variant key
+    // Step 1: Import and create Doc/Module instance
+    log.push('Step 1: Importing 📋 Doc/Module...');
+    var docComp = await figma.importComponentByKeyAsync(KEYS.docModule);
+    var docInstance = docComp.createInstance();
+    docInstance.name = 'Test Doc Panel';
+    outer.appendChild(docInstance);
+    log.push('✓ Doc/Module instance created');
 
-    log.push('Importing 📋 Doc/Module...');
-    var component = await figma.importComponentByKeyAsync(DOC_MODULE_KEY);
-    log.push('✓ Component imported: ' + component.name);
+    // Step 2: Import Handover/Section/Other
+    log.push('');
+    log.push('Step 2: Importing Handover/Section/Other...');
+    var secComp = await figma.importComponentByKeyAsync(KEYS.sectionOther);
+    log.push('✓ Section/Other component found: ' + secComp.name);
 
-    // Create instance
-    var instance = component.createInstance();
-    instance.name = 'Test Doc Panel';
-    outer.appendChild(instance);
-    log.push('✓ Instance created');
+    // Step 3: Find the slot inside the Doc/Module instance
+    log.push('');
+    log.push('Step 3: Looking for slot layer inside instance...');
+    var slotLayer = docInstance.findOne(function(n) {
+      return n.name === 'Sections' || n.name === 'Slot' || n.name.toLowerCase().includes('slot');
+    });
+    log.push(slotLayer ? '✓ Found slot layer: "' + slotLayer.name + '"' : '✗ No slot layer found by name');
 
-    // Try setting component properties
+    // Step 4: Try appending a Section/Other instance into the slot
+    log.push('');
+    log.push('Step 4: Appending Section/Other into slot...');
+    var secInstance = secComp.createInstance();
     try {
-      var props = instance.componentProperties;
-      var propNames = Object.keys(props);
-      log.push('Component properties (' + propNames.length + '):');
-      for (var i = 0; i < propNames.length; i++) {
-        log.push('  · ' + propNames[i] + ' = ' + JSON.stringify(props[propNames[i]].value));
+      if (slotLayer) {
+        slotLayer.appendChild(secInstance);
+        log.push('✓ appendChild to slot layer succeeded!');
+      } else {
+        // Try appending directly to the doc instance
+        docInstance.appendChild(secInstance);
+        log.push('✓ appendChild to doc instance directly');
       }
 
-      // Try setting Epic and Instance text properties
+      // Step 5: Set text on the section
+      log.push('');
+      log.push('Step 5: Setting section text properties...');
+      var secProps = secInstance.componentProperties;
+      var secPropNames = Object.keys(secProps);
+      log.push('Section properties: ' + secPropNames.join(', '));
       var setProps = {};
-      for (var j = 0; j < propNames.length; j++) {
-        var n = propNames[j];
-        if (n.startsWith('Epic')) setProps[n] = 'Colour';
-        if (n.startsWith('Instance')) setProps[n] = 'Primitives';
-        if (n.startsWith('Purpose')) setProps[n] = 'Primitive colour tokens — base palette only, used via semantic variables';
-      }
-      if (Object.keys(setProps).length > 0) {
-        instance.setProperties(setProps);
-        log.push('✓ Properties set successfully!');
+      secPropNames.forEach(function(n) {
+        if (n.startsWith('Label')) setProps[n] = 'Test label';
+        if (n.startsWith('Bullet') || n.startsWith('Content')) setProps[n] = 'This content was set by the plugin!';
+      });
+      if (Object.keys(setProps).length) {
+        secInstance.setProperties(setProps);
+        log.push('✓ Section text set!');
       }
     } catch(e) {
-      log.push('⚠ setProperties failed: ' + String(e));
+      log.push('✗ appendChild failed: ' + String(e));
     }
 
   } catch(e) {
     log.push('✗ Failed: ' + String(e));
-    log.push('  → Is Core + Third Party Library enabled in this file?');
+    log.push('  → Is Core + Third Party Library enabled?');
   }
 
   // Log output
