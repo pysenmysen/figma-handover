@@ -156,11 +156,20 @@ function isSemantic(col) {
   return t > 0 && a / t > 0.5;
 }
 
-// Find existing frame anywhere on the page (including inside sections)
+// Find existing frame — top-level only (page direct children + inside sections)
 function findExistingFrame(name) {
-  return figma.currentPage.findOne(function(n) {
-    return n.type === 'FRAME' && n.name === name;
-  });
+  // Check direct page children first
+  for (var i = 0; i < figma.currentPage.children.length; i++) {
+    var n = figma.currentPage.children[i];
+    if (n.type === 'FRAME' && n.name === name) return n;
+    // Also check inside sections
+    if (n.type === 'SECTION') {
+      for (var j = 0; j < n.children.length; j++) {
+        if (n.children[j].type === 'FRAME' && n.children[j].name === name) return n.children[j];
+      }
+    }
+  }
+  return null;
 }
 
 // Clear all children from a frame
@@ -205,9 +214,9 @@ async function buildPrimitivesFrame(col) {
   }
   outer.fills = []; outer.clipsContent = false;
   outer.layoutMode = 'HORIZONTAL'; outer.itemSpacing = 20;
-  outer.counterAxisSizingMode = 'AUTO'; // hug height
-  outer.primaryAxisSizingMode = 'AUTO';
-  outer.resize(FRAME_W, 100); // sets initial width; height hugs content
+  outer.resize(FRAME_W, 100);         // set width first
+  outer.primaryAxisSizingMode = 'AUTO';  // then hug height
+  outer.counterAxisSizingMode = 'FIXED'; // keep fixed width
 
   // Add Doc/Module only on first generate — never touch on update
   if (isNew) {
@@ -236,9 +245,9 @@ async function buildPrimitivesFrame(col) {
   primContent.fills = []; primContent.clipsContent = false;
   primContent.layoutMode = 'VERTICAL'; primContent.itemSpacing = 16;
   var primW = FRAME_W - 320 - 20; // FRAME_W minus Doc/Module width and gap
-  primContent.primaryAxisSizingMode = 'AUTO'; // hug height
-  primContent.counterAxisSizingMode = 'FIXED'; // fixed width
-  primContent.resize(primW, 100); // explicit width so wrap knows where to break
+  primContent.resize(primW, 100);           // set width first
+  primContent.primaryAxisSizingMode = 'AUTO';  // hug height
+  primContent.counterAxisSizingMode = 'FIXED'; // keep fixed width
 
   // Group tokens
   var modeId = col.defaultModeId;
