@@ -6,81 +6,85 @@
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
-    --comp: #8A38F5; --comp-15: rgba(138,56,245,0.15);
+    --comp: #8A38F5; --comp-d: #7028e4;
+    --green: #2D7D46; --green-d: #246038;
     --bg: #0F0F0F; --surface: #1A1A1A; --surface2: #222;
-    --border: rgba(255,255,255,0.08); --border2: rgba(255,255,255,0.14);
-    --text: #F0F0F0; --muted: rgba(240,240,240,0.45); --green: #4CAF50;
+    --border: rgba(255,255,255,0.07); --border2: rgba(255,255,255,0.13);
+    --text: #F0F0F0; --muted: rgba(240,240,240,0.42);
   }
   body { background:var(--bg); color:var(--text); font-family:-apple-system,'Helvetica Neue',sans-serif; font-size:12px; height:100vh; display:flex; flex-direction:column; overflow:hidden; }
 
+  /* Header */
   .hdr { display:flex; align-items:center; gap:10px; padding:12px 16px; border-bottom:0.5px solid var(--border2); flex-shrink:0; }
-  .logo-mark { width:24px; height:24px; border-radius:6px; background:var(--comp); display:grid; grid-template-columns:1fr 1fr; gap:2.5px; padding:5px; flex-shrink:0; }
-  .logo-mark span { display:block; border-radius:1px; background:white; }
-  .logo-mark span:nth-child(2), .logo-mark span:nth-child(3) { opacity:.55; }
-  .logo-mark span:nth-child(4) { opacity:.25; }
+  .logo { width:24px; height:24px; border-radius:6px; background:var(--comp); display:grid; grid-template-columns:1fr 1fr; gap:2.5px; padding:5px; flex-shrink:0; }
+  .logo span { display:block; border-radius:1px; background:white; }
+  .logo span:nth-child(2), .logo span:nth-child(3) { opacity:.55; }
+  .logo span:nth-child(4) { opacity:.25; }
   .logo-name { font-size:12px; font-weight:600; letter-spacing:.05em; text-transform:uppercase; }
   .logo-sub  { font-size:10px; color:var(--muted); }
 
+  /* Screens */
   .screen { flex:1; overflow-y:auto; display:flex; flex-direction:column; }
   .screen.hidden { display:none !important; }
 
-  /* Pick */
-  .pick { padding:16px; display:flex; flex-direction:column; flex:1; gap:10px; }
-  .pick-title { font-size:13px; font-weight:500; }
-  .pick-sub   { font-size:11px; color:var(--muted); line-height:1.5; }
-  .sel-bar { display:flex; align-items:center; justify-content:space-between; }
-  .sel-count { font-size:10px; color:var(--muted); }
-  .sel-count b { color:var(--comp); }
-  .btn-link { background:none; border:none; font-size:10px; color:var(--muted); cursor:pointer; font-family:inherit; padding:0; }
-  .btn-link:hover { color:var(--comp); }
-  .col-list { display:flex; flex-direction:column; gap:6px; flex:1; }
-  .col-card { background:var(--surface); border:0.5px solid var(--border); border-radius:10px; padding:12px 14px; cursor:pointer; transition:border-color .15s; display:flex; align-items:center; gap:12px; }
-  .col-card:hover { border-color:var(--border2); }
-  .col-card.selected { border-color:var(--comp); background:rgba(138,56,245,0.06); }
-  .col-check { width:18px; height:18px; border-radius:5px; flex-shrink:0; border:1.5px solid var(--border2); display:flex; align-items:center; justify-content:center; transition:all .15s; }
-  .col-card.selected .col-check { background:var(--comp); border-color:var(--comp); }
-  .col-check-inner { width:5px; height:8px; border-right:2px solid white; border-bottom:2px solid white; transform:rotate(40deg) translateY(-1px); opacity:0; transition:opacity .15s; }
-  .col-card.selected .col-check-inner { opacity:1; }
-  .col-info { flex:1; min-width:0; }
-  .col-name { font-size:12px; font-weight:500; margin-bottom:2px; }
-  .col-meta { font-size:10px; color:var(--muted); }
+  /* Main list */
+  .list-wrap { flex:1; padding:12px 16px; display:flex; flex-direction:column; gap:6px; }
+
+  .section-card {
+    background:var(--surface); border:0.5px solid var(--border);
+    border-radius:10px; padding:10px 12px;
+    display:flex; align-items:center; gap:12px;
+  }
+  .section-info { flex:1; min-width:0; }
+  .section-name { font-size:12px; font-weight:500; margin-bottom:2px; }
+  .section-meta { font-size:10px; color:var(--muted); }
+
+  .btn-gen {
+    font-size:11px; font-weight:500; border-radius:7px; border:none;
+    cursor:pointer; padding:6px 14px; font-family:inherit;
+    background:var(--comp); color:white; white-space:nowrap; flex-shrink:0;
+    transition:background .15s;
+  }
+  .btn-gen:hover { background:var(--comp-d); }
+  .btn-gen.update { background:var(--green); }
+  .btn-gen.update:hover { background:var(--green-d); }
+  .btn-gen:disabled { opacity:.35; cursor:not-allowed; }
 
   /* Footer */
-  .pick-footer { padding-top:12px; border-top:0.5px solid var(--border); display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
-  .footer-note { font-size:10px; color:var(--muted); max-width:220px; line-height:1.4; }
-  .existing-note { font-size:10px; color:var(--comp); margin-bottom:6px; display:none; }
-  .btn-update { background: #2D7D46 !important; }
-  .btn { font-size:11px; font-weight:500; border-radius:7px; border:none; cursor:pointer; padding:7px 16px; font-family:inherit; transition:opacity .15s; }
-  .btn:disabled { opacity:.35; cursor:not-allowed; }
-  .btn-primary { background:var(--comp); color:white; }
-  .btn-primary:hover:not(:disabled) { opacity:.85; }
-  .btn-ghost { background:transparent; color:var(--muted); border:0.5px solid var(--border2); }
-  .btn-ghost:hover { color:var(--text); }
+  .footer {
+    padding:12px 16px; border-top:0.5px solid var(--border2);
+    display:flex; align-items:center; justify-content:space-between;
+    flex-shrink:0; gap:8px;
+  }
+  .footer-note { font-size:10px; color:var(--muted); line-height:1.4; flex:1; }
+  .btn-all {
+    font-size:11px; font-weight:500; border-radius:7px; border:none;
+    cursor:pointer; padding:7px 18px; font-family:inherit;
+    background:var(--comp); color:white; white-space:nowrap;
+    transition:background .15s;
+  }
+  .btn-all:hover { background:var(--comp-d); }
+  .btn-all.has-updates { background:var(--green); }
+  .btn-all.has-updates:hover { background:var(--green-d); }
 
   /* Progress */
-  .prog-wrap { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:32px 24px; gap:12px; }
+  .prog-wrap { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:32px 24px; gap:14px; }
   .prog-title { font-size:13px; font-weight:500; }
+  .prog-sub { font-size:11px; color:var(--muted); }
   .prog-bar-wrap { width:100%; max-width:260px; height:3px; background:var(--border2); border-radius:2px; overflow:hidden; }
   .prog-bar { height:100%; background:var(--comp); border-radius:2px; transition:width .35s ease; }
-  .prog-sub { font-size:11px; color:var(--muted); }
-  .prog-steps { width:100%; max-width:260px; display:flex; flex-direction:column; gap:8px; }
-  .prog-step { display:flex; align-items:center; gap:10px; font-size:11px; color:var(--muted); }
-  .prog-step.active { color:var(--comp); }
-  .prog-step.done  { color:var(--text); }
-  .step-dot { width:7px; height:7px; border-radius:50%; background:var(--border2); flex-shrink:0; }
-  .prog-step.active .step-dot { background:var(--comp); box-shadow:0 0 0 3px var(--comp-15); }
-  .prog-step.done .step-dot  { background:var(--green); }
 
   /* Done */
   .done-wrap { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:32px; }
   .done-icon { font-size:32px; }
   .done-title { font-size:14px; font-weight:500; }
-  .done-sub { font-size:11px; color:var(--muted); text-align:center; line-height:1.5; }
+  .done-sub { font-size:11px; color:var(--muted); text-align:center; }
   .done-btns { display:flex; gap:8px; margin-top:8px; }
+  .btn-ghost { background:transparent; color:var(--muted); border:0.5px solid var(--border2); border-radius:7px; padding:7px 16px; font-size:11px; cursor:pointer; font-family:inherit; }
+  .btn-ghost:hover { color:var(--text); }
 
   /* Empty */
   .empty { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; padding:32px; color:var(--muted); text-align:center; }
-  .empty-icon { font-size:28px; opacity:.3; }
 
   ::-webkit-scrollbar { width:3px; }
   ::-webkit-scrollbar-thumb { background:var(--border2); border-radius:2px; }
@@ -89,48 +93,28 @@
 <body>
 
 <div class="hdr">
-  <div class="logo-mark"><span></span><span></span><span></span><span></span></div>
+  <div class="logo"><span></span><span></span><span></span><span></span></div>
   <div>
     <div class="logo-name">Grebbans</div>
-    <div class="logo-sub" id="ver-sub">Colour Variables · v3.0</div>
+    <div class="logo-sub" id="ver-sub">Handover · v7.0</div>
   </div>
 </div>
 
-<!-- LOADING -->
-<div class="screen" id="s-loading">
-  <div class="empty">
-    <div class="empty-icon">◈</div>
-    <p>Reading collections…</p>
-  </div>
-</div>
-
-<!-- PICK -->
-<div class="screen hidden" id="s-pick">
-  <div class="pick">
-    <div class="pick-title">Select collections to visualise</div>
-    <div class="pick-sub">Select collections and styles to visualise.</div>
-    <div class="sel-bar">
-      <span class="sel-count"><b id="count">0</b> selected</span>
-      <button class="btn-link" onclick="toggleAll()">Select all</button>
-    </div>
-    <div class="col-list" id="col-list"></div>
-    <div class="pick-footer">
-      <div>
-        <div class="existing-note" id="existing-note"></div>
-        <div class="footer-note">Each selection generates a separate frame. Re-run to update.</div>
-      </div>
-      <button class="btn btn-primary" id="btn-build" disabled onclick="startBuild()">Build frames</button>
-    </div>
+<!-- MAIN -->
+<div class="screen hidden" id="s-main">
+  <div class="list-wrap" id="item-list"></div>
+  <div class="footer">
+    <div class="footer-note" id="footer-note">Frames are placed inside the ✏️ Style sheet section if it exists.</div>
+    <button class="btn-all" id="btn-all" onclick="buildAll()">Generate all</button>
   </div>
 </div>
 
 <!-- PROGRESS -->
 <div class="screen hidden" id="s-progress">
   <div class="prog-wrap">
-    <div class="prog-title">Building colour frames…</div>
-    <div class="prog-bar-wrap"><div class="prog-bar" id="prog-bar" style="width:5%"></div></div>
+    <div class="prog-title">Building…</div>
+    <div class="prog-bar-wrap"><div class="prog-bar" id="prog-bar" style="width:10%"></div></div>
     <div class="prog-sub" id="prog-sub">Starting…</div>
-    <div class="prog-steps" id="prog-steps"></div>
   </div>
 </div>
 
@@ -138,11 +122,11 @@
 <div class="screen hidden" id="s-done">
   <div class="done-wrap">
     <div class="done-icon">✦</div>
-    <div class="done-title">Frames built!</div>
-    <div class="done-sub" id="done-sub">Colour frames are on your canvas.</div>
+    <div class="done-title" id="done-title">Done!</div>
+    <div class="done-sub" id="done-sub">Frames updated on canvas.</div>
     <div class="done-btns">
-      <button class="btn btn-ghost" onclick="showPick()">← Back</button>
-      <button class="btn btn-primary" onclick="parent.postMessage({pluginMessage:{type:'close'}},'*')">Close plugin</button>
+      <button class="btn-ghost" onclick="show('s-main')">← Back</button>
+      <button class="btn-all" onclick="parent.postMessage({pluginMessage:{type:'close'}},'*')">Close</button>
     </div>
   </div>
 </div>
@@ -150,156 +134,121 @@
 <!-- EMPTY -->
 <div class="screen hidden" id="s-empty">
   <div class="empty">
-    <div class="empty-icon">⬡</div>
-    <div style="font-size:13px;font-weight:500;">No colour variables found</div>
-    <div style="font-size:11px;">Add local variable collections with colour tokens first.</div>
+    <div style="font-size:28px;opacity:.3">⬡</div>
+    <div style="font-size:13px;font-weight:500">Nothing to generate</div>
+    <div style="font-size:11px">No colour variables or styles found in this file.</div>
   </div>
 </div>
 
 <script>
-var collections = [];
-var selected = {};
-var stylesSelected = false;
-var typographySelected = false;
+var items = [];
+var collectionMap = {};
+var buildQueue = [];
+var builtCount = 0;
 
 window.onmessage = function(e) {
   var msg = e.data.pluginMessage;
   if (!msg) return;
-  if (msg.type === 'collections') {
-    collections = msg.data;
-    document.getElementById('ver-sub').textContent = 'Colour Variables · v' + msg.version;
-    if (!collections.length && !msg.hasStyles) { show('s-empty'); return; }
-    collections.forEach(function(c) { selected[c.id] = true; });
-    stylesSelected = msg.hasStyles || false;
-    typographySelected = msg.hasTypography || false;
-    renderList(msg.hasStyles, msg.styleCount, msg.hasTypography, msg.typographyCount);
-    if (msg.hasExisting && msg.existingNames && msg.existingNames.length) {
-      document.getElementById('btn-build').textContent = 'Update frames';
-      document.getElementById('btn-build').classList.add('btn-update');
-      document.getElementById('existing-note').textContent = msg.existingNames.join(', ') + ' already on canvas';
-      document.getElementById('existing-note').style.display = 'block';
-    } else {
-      document.getElementById('btn-build').textContent = 'Build frames';
-      document.getElementById('existing-note').style.display = 'none';
-    }
-    show('s-pick');
+
+  if (msg.type === 'init') {
+    document.getElementById('ver-sub').textContent = 'Handover · v' + msg.version;
+    items = msg.items;
+    if (!items.length) { show('s-empty'); return; }
+    renderList();
+    show('s-main');
   }
+
   if (msg.type === 'progress') {
-    var pct = Math.round(((msg.step + 0.5) / msg.total) * 100);
-    document.getElementById('prog-bar').style.width = pct + '%';
-    document.getElementById('prog-sub').textContent = 'Building: ' + msg.name;
-    document.querySelectorAll('.prog-step').forEach(function(s, i) {
-      s.classList.remove('active', 'done');
-      if (i < msg.step) s.classList.add('done');
-      if (i === msg.step) s.classList.add('active');
-    });
+    document.getElementById('prog-sub').textContent = msg.name;
+    var idx = buildQueue.indexOf(msg.name);
+    var pct = buildQueue.length ? Math.round(((idx + 0.5) / buildQueue.length) * 100) : 50;
+    document.getElementById('prog-bar').style.width = Math.max(pct, 10) + '%';
   }
+
   if (msg.type === 'done') {
+    // Mark built items as "exists"
+    buildQueue.forEach(function(id) {
+      var item = items.find(function(i) { return i.id === id || i.name === id; });
+      if (item) item.exists = true;
+    });
     document.getElementById('prog-bar').style.width = '100%';
-    var n = collections.filter(function(c) { return selected[c.id]; }).length;
-    document.getElementById('done-sub').textContent = n + ' collection' + (n !== 1 ? 's' : '') + ' + effects & gradients drawn on your canvas.';
-    document.getElementById('btn-build').textContent = 'Update frames';
-    document.getElementById('btn-build').classList.add('btn-update');
-    document.getElementById('existing-note').textContent = 'Frames are on canvas';
-    document.getElementById('existing-note').style.display = 'block';
+    document.getElementById('done-title').textContent = 'Done!';
+    document.getElementById('done-sub').textContent = buildQueue.length + ' frame' + (buildQueue.length !== 1 ? 's' : '') + ' built on canvas.';
     setTimeout(function() { show('s-done'); }, 300);
   }
+
   if (msg.type === 'error') {
-    showPick();
-    alert('Error: ' + msg.message);
+    show('s-main');
+    document.getElementById('footer-note').textContent = '✗ ' + msg.message;
   }
 };
 
-function renderList(hasStyles, styleCount, hasTypography, typographyCount) {
-  var list = document.getElementById('col-list');
+function renderList() {
+  var list = document.getElementById('item-list');
   list.innerHTML = '';
-  collections.forEach(function(col) {
+  var hasAny = false, hasUpdates = false;
+
+  items.forEach(function(item) {
+    hasAny = true;
+    if (item.exists) hasUpdates = true;
+
     var card = document.createElement('div');
-    card.className = 'col-card' + (selected[col.id] ? ' selected' : '');
-    card.innerHTML = '<div class="col-check"><div class="col-check-inner"></div></div>'
-      + '<div class="col-info"><div class="col-name">' + esc(col.name) + '</div>'
-      + '<div class="col-meta">' + col.colorCount + ' colour' + (col.colorCount !== 1 ? 's' : '')
-      + (col.modes.length > 1 ? ' · ' + col.modes.length + ' modes' : '') + '</div></div>';
-    card.onclick = function() { toggle(col.id, card); };
+    card.className = 'section-card';
+    card.innerHTML = '<div class="section-info">'
+      + '<div class="section-name">' + esc(item.name) + '</div>'
+      + '<div class="section-meta">' + esc(item.meta) + '</div>'
+      + '</div>'
+      + '<button class="btn-gen' + (item.exists ? ' update' : '') + '" data-id="' + esc(item.id) + '">'
+      + (item.exists ? 'Update' : 'Generate')
+      + '</button>';
+
+    card.querySelector('.btn-gen').onclick = function() {
+      buildTargets([item.id]);
+    };
     list.appendChild(card);
   });
-  // Add Effects & Gradients card if styles exist
-  if (hasStyles) {
-    var styleCard = document.createElement('div');
-    styleCard.className = 'col-card' + (stylesSelected ? ' selected' : '');
-    styleCard.id = 'styles-card';
-    styleCard.innerHTML = '<div class="col-check"><div class="col-check-inner"></div></div>'
-      + '<div class="col-info"><div class="col-name">Effects &amp; Gradients</div>'
-      + '<div class="col-meta">' + (styleCount || 0) + ' styles</div></div>';
-    styleCard.onclick = function() {
-      stylesSelected = !stylesSelected;
-      styleCard.classList.toggle('selected', stylesSelected);
-      updateCount();
-    };
-    list.appendChild(styleCard);
+
+  var btnAll = document.getElementById('btn-all');
+  if (hasUpdates) {
+    btnAll.textContent = 'Update all';
+    btnAll.classList.add('has-updates');
+  } else {
+    btnAll.textContent = 'Generate all';
+    btnAll.classList.remove('has-updates');
   }
-  // Add Typography card
-  if (hasTypography) {
-    var typeCard = document.createElement('div');
-    typeCard.className = 'col-card' + (typographySelected ? ' selected' : '');
-    typeCard.id = 'type-card';
-    typeCard.innerHTML = '<div class="col-check"><div class="col-check-inner"></div></div>'
-      + '<div class="col-info"><div class="col-name">Typography</div>'
-      + '<div class="col-meta">' + (typographyCount || 0) + ' text styles</div></div>';
-    typeCard.onclick = function() {
-      typographySelected = !typographySelected;
-      typeCard.classList.toggle('selected', typographySelected);
-      updateCount();
-    };
-    list.appendChild(typeCard);
-  }
-  updateCount();
 }
 
-function toggle(id, card) {
-  selected[id] = !selected[id];
-  card.classList.toggle('selected', selected[id]);
-  updateCount();
+function buildAll() {
+  buildTargets(items.map(function(i) { return i.id; }));
 }
 
-function toggleAll() {
-  var anyOff = collections.some(function(c) { return !selected[c.id]; });
-  collections.forEach(function(c) { selected[c.id] = anyOff; });
-  document.querySelectorAll('.col-card').forEach(function(card, i) {
-    card.classList.toggle('selected', selected[collections[i].id]);
-  });
-  updateCount();
-}
-
-function updateCount() {
-  var n = collections.filter(function(c) { return selected[c.id]; }).length;
-  if (stylesSelected) n++;
-  if (typographySelected) n++;
-  document.getElementById('count').textContent = n;
-  document.getElementById('btn-build').disabled = n === 0;
-}
-
-function startBuild() {
-  var ids = collections.filter(function(c) { return selected[c.id]; }).map(function(c) { return c.id; });
-  var steps = document.getElementById('prog-steps');
-  var stepItems = ids.map(function(id) {
-    var col = collections.find(function(c) { return c.id === id; });
-    return '<div class="prog-step"><div class="step-dot"></div><span>' + esc(col ? col.name : id) + '</span></div>';
-  });
-  if (stylesSelected) stepItems.push('<div class="prog-step"><div class="step-dot"></div><span>Effects &amp; Gradients</span></div>');
-  if (typographySelected) stepItems.push('<div class="prog-step"><div class="step-dot"></div><span>Typography</span></div>');
-  steps.innerHTML = stepItems.join('');
+function buildTargets(ids) {
+  buildQueue = ids;
+  builtCount = 0;
+  document.getElementById('prog-bar').style.width = '10%';
+  document.getElementById('prog-sub').textContent = 'Starting…';
   show('s-progress');
-  parent.postMessage({ pluginMessage: { type: 'build', collectionIds: ids, buildStyles: stylesSelected, buildTypography: typographySelected } }, '*');
+
+  // Build collection map
+  var cm = {};
+  items.forEach(function(i) { cm[i.id] = i; });
+
+  parent.postMessage({ pluginMessage: {
+    type: 'build',
+    targets: ids,
+    collectionMap: cm
+  }}, '*');
 }
 
-function showPick() { show('s-pick'); }
 function show(id) {
-  ['s-loading','s-pick','s-progress','s-done','s-empty'].forEach(function(s) {
+  ['s-main','s-progress','s-done','s-empty'].forEach(function(s) {
     document.getElementById(s).classList.toggle('hidden', s !== id);
   });
 }
-function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
 </script>
 </body>
 </html>
