@@ -92,6 +92,10 @@ figma.ui.onmessage = async function(msg) {
       try { await buildComponentTest(); }
       catch(err) { figma.ui.postMessage({ type: 'error', message: String(err) }); return; }
     }
+    if (msg.buildColourCardTest) {
+      try { await buildColourCardTest(); }
+      catch(err) { figma.ui.postMessage({ type: 'error', message: String(err) }); return; }
+    }
     figma.ui.postMessage({ type: 'done' });
   }
   if (msg.type === 'close') figma.closePlugin();
@@ -1256,6 +1260,7 @@ var KEYS = {
   docModule:       '8df1ea68f02f91062978acb1ccbab2cec2e92171', // 📋 Doc/Module State=Default
   sectionOther:    'eb7778ad03fc3564e5b9c25cdeae1743a5233402', // Handover/Section/Other
   sectionOption:   'fcd2f3c2808271c76d581b54e0cea7679c9fee3d', // Handover/Section/Option
+  colourPrimitive: '0f4a992b74f79d0754a10487640c165f040cf6be', // 📋 Doc/Colour Type=Primitive
 };
 // Section title property name (found from mini test)
 var SECTION_TITLE_PROP = 'Section title#134:20';
@@ -1349,6 +1354,109 @@ async function buildComponentTest() {
     t.fills = [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 } }];
     t.textAutoResize = 'WIDTH_AND_HEIGHT';
     outer.appendChild(t);
+  }
+
+  figma.currentPage.appendChild(outer);
+  figma.viewport.scrollAndZoomIntoView([outer]);
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MINI TEST — one colour card instance using 📋 Doc/Colour component
+// Only renders first group of first primitive collection
+// ══════════════════════════════════════════════════════════════════════════════
+async function buildColourCardTest() {
+  figma.currentPage.findAll(function(n) {
+    return n.type === 'FRAME' && n.name === '◈ Colour Card Test';
+  }).forEach(function(f) { f.remove(); });
+
+  var outer = figma.createFrame();
+  outer.name = '◈ Colour Card Test';
+  outer.fills = [];
+  outer.layoutMode = 'HORIZONTAL';
+  outer.layoutWrap = 'WRAP';
+  outer.itemSpacing = 4;
+  outer.counterAxisSpacing = 4;
+  outer.primaryAxisSizingMode = 'FIXED';
+  outer.counterAxisSizingMode = 'AUTO';
+  outer.resize(FRAME_W, 100);
+  outer.clipsContent = false;
+
+  await figma.loadFontAsync({ family: 'Inter', style: 'Regular' });
+
+  try {
+    // Import the colour card component
+    var colComp = await figma.importComponentByKeyAsync(KEYS.colourPrimitive);
+
+    // Get first primitive collection, first group of tokens
+    var collections = figma.variables.getLocalVariableCollections();
+    var primCol = null;
+    for (var ci = 0; ci < collections.length; ci++) {
+      if (!isSemantic(collections[ci])) { primCol = collections[ci]; break; }
+    }
+    if (!primCol) throw new Error('No primitive collection found');
+
+    var modeId = primCol.defaultModeId;
+    var count = 0;
+    var MAX = 8; // just first 8 tokens for the test
+
+    for (var vi = 0; vi < primCol.variableIds.length && count < MAX; vi++) {
+      var v = figma.variables.getVariableById(primCol.variableIds[vi]);
+      if (!v || v.resolvedType !== 'COLOR') continue;
+
+      var raw = v.valuesByMode[modeId] || v.valuesByMode[Object.keys(v.valuesByMode)[0]];
+      var res = raw ? resolveColor(raw, modeId) : null;
+      if (!res) continue;
+
+      var hasAlpha = res.rgba.a < 0.99;
+      var cssName = '--' + v.name.replace(/\//g, '-').toLowerCase();
+      var hexVal = toHex(res.rgba.r, res.rgba.g, res.rgba.b);
+      var alphaVal = Math.round(res.rgba.a * 100) + '%';
+
+      // Create instance
+      var inst = colComp.createInstance();
+      outer.appendChild(inst);
+
+      // Set text nodes
+      try {
+        var nameNode = inst.findOne(function(n) { return n.name === 'VariantName'; });
+        var hexNode  = inst.findOne(function(n) { return n.name === 'Hex'; });
+        var opNode   = inst.findOne(function(n) { return n.name === 'Opacity'; });
+
+        if (nameNode) nameNode.characters = cssName;
+        if (hexNode)  hexNode.characters  = hexVal;
+        if (opNode) {
+          if (hasAlpha) {
+            opNode.characters = alphaVal;
+            opNode.visible = true;
+          } else {
+            opNode.visible = false;
+          }
+        }
+      } catch(e) { /* text set failed, keep defaults */ }
+
+      // Bind colour variable to the Colour fill frame
+      try {
+        var colourFrame = inst.findOne(function(n) { return n.name === 'Colour'; });
+        if (colourFrame) {
+          var colorFill = { type: 'SOLID', color: { r: res.rgba.r, g: res.rgba.g, b: res.rgba.b }, opacity: res.rgba.a };
+          var bf = figma.variables.setBoundVariableForPaint(colorFill, 'color', v);
+          colourFrame.fills = [bf];
+        }
+      } catch(e) { /* variable bind failed */ }
+
+      count++;
+    }
+
+  } catch(e) {
+    await figma.loadFontAsync({ family: 'Inter', style: 'Regular' });
+    var errT = figma.createText();
+    try { errT.fontName = { family: 'Inter', style: 'Regular' }; } catch(e2) {}
+    errT.fontSize = 12;
+    errT.characters = 'Error: ' + String(e);
+    errT.fills = [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 } }];
+    errT.textAutoResize = 'WIDTH_AND_HEIGHT';
+    outer.appendChild(errT);
   }
 
   figma.currentPage.appendChild(outer);
