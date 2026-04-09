@@ -324,36 +324,20 @@ async function buildTypography() {
     } catch(e) {}
     docInst.setProperties(docProps);
 
-    // Populate Sections slot → Slots/Datapoints → DataRow for Font family
+    // Populate Sections slot — DataRow directly (nested slot modification not supported by plugin API)
     try {
       var sectionsSlot = docInst.findOne(function(n) { return n.name === 'Sections'; });
       if (sectionsSlot) {
         while (sectionsSlot.children.length > 0) sectionsSlot.children[sectionsSlot.children.length - 1].remove();
 
-        var dpInst = dpComp.createInstance();
-        sectionsSlot.appendChild(dpInst);
+        var row = drComp.createInstance();
+        try { row.setProperties({ 'Show DataSource#237:108': false, 'Required#134:10': false }); } catch(e) {}
+        sectionsSlot.appendChild(row);
 
-        // Find Datapoints slot within Slots/Datapoints
-        var dpSlot = dpInst.findOne(function(n) { return n.name === 'Datapoints'; });
-        if (dpSlot) {
-          while (dpSlot.children.length > 0) dpSlot.children[dpSlot.children.length - 1].remove();
-
-          var row = drComp.createInstance();
-          dpSlot.appendChild(row);
-
-          // Hide DataSource and Required
-          try {
-            row.setProperties({
-              'Show DataSource#237:108': false,
-              'Required#134:10':         false,
-            });
-          } catch(e) {}
-
-          var dpT = row.findOne(function(n) { return n.name === 'Datapoint' && n.type === 'TEXT'; });
-          var vrT = row.findOne(function(n) { return n.name === 'Value/rule' && n.type === 'TEXT'; });
-          if (dpT) { try { dpT.characters = 'Font family'; } catch(e) {} }
-          if (vrT) { try { vrT.characters = fontFamily; } catch(e) {} }
-        }
+        var dpT = row.findOne(function(n) { return n.name === 'Datapoint' && n.type === 'TEXT'; });
+        var vrT = row.findOne(function(n) { return n.name === 'Value/rule' && n.type === 'TEXT'; });
+        if (dpT) { try { dpT.characters = 'Font family'; } catch(e) {} }
+        if (vrT) { try { vrT.characters = fontFamily; } catch(e) {} }
       }
     } catch(e) {}
 
