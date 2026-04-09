@@ -84,22 +84,10 @@ figma.ui.onmessage = async function(msg) {
       try { buildTypography(); }
       catch(err) { figma.ui.postMessage({ type: 'error', message: String(err) }); return; }
     }
-    if (msg.buildStyleTest) {
-      try { await buildStyleTest(); }
-      catch(err) { figma.ui.postMessage({ type: 'error', message: String(err) }); return; }
-    }
-    if (msg.buildComponentTest) {
-      try { await buildComponentTest(); }
-      catch(err) { figma.ui.postMessage({ type: 'error', message: String(err) }); return; }
-    }
-    if (msg.buildColourCardTest) {
-      try { await buildColourCardTest(); }
-      catch(err) { figma.ui.postMessage({ type: 'error', message: String(err) }); return; }
-    }
-    if (msg.updatePrimitives) {
-      try { await updatePrimitivesFrame(); }
-      catch(err) { figma.ui.postMessage({ type: 'error', message: String(err) }); return; }
-    }
+
+
+
+
     figma.ui.postMessage({ type: 'done' });
   }
   if (msg.type === 'close') figma.closePlugin();
@@ -195,10 +183,11 @@ function makeText(chars, size, r, g, b, a, rightAlign) {
 async function buildAll(collectionIds) {
   // Check if ✏️ Style sheet section exists — update in place if so
   var section = figma.currentPage.findOne(function(n) {
-    return n.type === 'SECTION' && n.name.indexOf('Style sheet') !== -1;
+    return n.type === 'SECTION' && (n.name.indexOf('Style sheet') !== -1 || n.name.indexOf('style sheet') !== -1);
   });
 
   if (section) {
+    figma.ui.postMessage({ type: 'progress', step: 0, total: 1, name: 'Found: ' + section.name });
     for (var ci = 0; ci < collectionIds.length; ci++) {
       var col = figma.variables.getVariableCollectionById(collectionIds[ci]);
       if (!col) continue;
@@ -207,6 +196,7 @@ async function buildAll(collectionIds) {
     }
     return;
   }
+  figma.ui.postMessage({ type: 'progress', step: 0, total: 1, name: 'No Style sheet section found — building standalone' });
 
   // Standalone mode — find or create frame per collection
   var colCount = 0;
@@ -1127,94 +1117,6 @@ function buildSpecPill(parent, label, value) {
 
 
 // ══════════════════════════════════════════════════════════════════════════════
-// MINI TEST — importStyleByKeyAsync
-// Tests if library text styles can be applied to generated text nodes
-// ══════════════════════════════════════════════════════════════════════════════
-async function buildStyleTest() {
-  figma.currentPage.findAll(function(n) {
-    return n.type === 'FRAME' && n.name === '◈ Style Test';
-  }).forEach(function(f) { f.remove(); });
-
-  var outer = figma.createFrame();
-  outer.name = '◈ Style Test';
-  outer.fills = [{ type: 'SOLID', color: { r: 0.95, g: 0.95, b: 0.95 } }];
-  outer.cornerRadius = 20;
-  outer.layoutMode = 'VERTICAL';
-  outer.itemSpacing = 16;
-  outer.paddingLeft = outer.paddingRight = outer.paddingTop = outer.paddingBottom = 24;
-  outer.primaryAxisSizingMode = 'AUTO';
-  outer.counterAxisSizingMode = 'AUTO';
-
-  await figma.loadFontAsync({ family: 'Inter', style: 'Regular' });
-
-  var results = [];
-  var importedStyle = null;
-
-  // ── Attempt 1: getAvailableSharedStylesAsync (requires teamlibrary permission) ──
-  try {
-    var sharedStyles = await figma.teamLibrary.getAvailableSharedStylesAsync('TEXT');
-    results.push('✓ teamLibrary API works — found ' + sharedStyles.length + ' shared text styles');
-
-    // Find 📋 Handover/12_100
-    var target = null;
-    for (var i = 0; i < sharedStyles.length; i++) {
-      results.push('  · ' + sharedStyles[i].name + ' [' + sharedStyles[i].key + ']');
-      if (sharedStyles[i].name === '📋 Handover/12_100') target = sharedStyles[i];
-    }
-
-    if (target) {
-      results.push('');
-      results.push('✓ Found target style: ' + target.name);
-      results.push('  key: ' + target.key);
-
-      // Import and apply
-      try {
-        importedStyle = await figma.importStyleByKeyAsync(target.key);
-        results.push('✓ importStyleByKeyAsync succeeded!');
-        results.push('  id: ' + importedStyle.id);
-
-        // Create "Hello it might work" with this style
-        await figma.loadFontAsync(importedStyle.fontName);
-        var hello = figma.createText();
-        hello.fontName = importedStyle.fontName;
-        hello.characters = 'Hello it might work!';
-        hello.textStyleId = importedStyle.id;
-        hello.fills = [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 } }];
-        hello.textAutoResize = 'WIDTH_AND_HEIGHT';
-        outer.appendChild(hello);
-
-        results.push('✓ Text node created with library style applied!');
-        results.push('  Check the text node — it should show "📋 Handover/12_100" in the panel');
-      } catch(e) {
-        results.push('✗ importStyleByKeyAsync failed: ' + String(e));
-      }
-    } else {
-      results.push('✗ 📋 Handover/12_100 not found in shared styles');
-    }
-  } catch(e) {
-    results.push('✗ teamLibrary API failed: ' + String(e));
-    results.push('  → Check manifest.json has "teamlibrary" permission');
-  }
-
-  // ── Report ──────────────────────────────────────────────────────────────
-  for (var ri = 0; ri < results.length; ri++) {
-    var rt = figma.createText();
-    try { rt.fontName = { family: 'Inter', style: 'Regular' }; } catch(e) {}
-    rt.fontSize = 11;
-    rt.characters = results[ri] || ' ';
-    rt.fills = [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 } }];
-    rt.textAutoResize = 'WIDTH_AND_HEIGHT';
-    outer.appendChild(rt);
-  }
-
-  figma.currentPage.appendChild(outer);
-  figma.viewport.scrollAndZoomIntoView([outer]);
-}
-
-
-// ══════════════════════════════════════════════════════════════════════════════
-// MINI TEST — component instance via importComponentByKeyAsync
-// ══════════════════════════════════════════════════════════════════════════════
 // Component + slot keys from Core + Third Party Library
 // All component keys from Core + Third Party Library
 var KEYS = {
@@ -1323,116 +1225,13 @@ async function buildComponentTest() {
 
 
 // ══════════════════════════════════════════════════════════════════════════════
-// MINI TEST — one colour card instance using 📋 Doc/Colour component
-// Only renders first group of first primitive collection
-// ══════════════════════════════════════════════════════════════════════════════
-async function buildColourCardTest() {
-  figma.currentPage.findAll(function(n) {
-    return n.type === 'FRAME' && n.name === '◈ Colour Card Test';
-  }).forEach(function(f) { f.remove(); });
-
-  var outer = figma.createFrame();
-  outer.name = '◈ Colour Card Test';
-  outer.fills = [];
-  outer.layoutMode = 'HORIZONTAL';
-  outer.layoutWrap = 'WRAP';
-  outer.itemSpacing = 4;
-  outer.counterAxisSpacing = 4;
-  outer.primaryAxisSizingMode = 'FIXED';
-  outer.counterAxisSizingMode = 'AUTO';
-  outer.resize(FRAME_W, 100);
-  outer.clipsContent = false;
-
-  await figma.loadFontAsync({ family: 'Inter', style: 'Regular' });
-
-  try {
-    // Import the colour card component
-    var colComp = await figma.importComponentByKeyAsync(KEYS.colourPrimitive);
-
-    // Get first primitive collection, first group of tokens
-    var collections = figma.variables.getLocalVariableCollections();
-    var primCol = null;
-    for (var ci = 0; ci < collections.length; ci++) {
-      if (!isSemantic(collections[ci])) { primCol = collections[ci]; break; }
-    }
-    if (!primCol) throw new Error('No primitive collection found');
-
-    var modeId = primCol.defaultModeId;
-    var count = 0;
-    var MAX = 8; // just first 8 tokens for the test
-
-    for (var vi = 0; vi < primCol.variableIds.length && count < MAX; vi++) {
-      var v = figma.variables.getVariableById(primCol.variableIds[vi]);
-      if (!v || v.resolvedType !== 'COLOR') continue;
-
-      var raw = v.valuesByMode[modeId] || v.valuesByMode[Object.keys(v.valuesByMode)[0]];
-      var res = raw ? resolveColor(raw, modeId) : null;
-      if (!res) continue;
-
-      var hasAlpha = res.rgba.a < 0.99;
-      var cssName = '--' + v.name.replace(/\//g, '-').toLowerCase();
-      var hexVal = toHex(res.rgba.r, res.rgba.g, res.rgba.b);
-      var alphaVal = Math.round(res.rgba.a * 100) + '%';
-
-      // Create instance
-      var inst = colComp.createInstance();
-      outer.appendChild(inst);
-
-      // Set text nodes
-      try {
-        var nameNode = inst.findOne(function(n) { return n.name === 'VariantName'; });
-        var hexNode  = inst.findOne(function(n) { return n.name === 'Hex'; });
-        var opNode   = inst.findOne(function(n) { return n.name === 'Opacity'; });
-
-        if (nameNode) nameNode.characters = cssName;
-        if (hexNode)  hexNode.characters  = hexVal;
-        if (opNode) {
-          if (hasAlpha) {
-            opNode.characters = alphaVal;
-            opNode.visible = true;
-          } else {
-            opNode.visible = false;
-          }
-        }
-      } catch(e) { /* text set failed, keep defaults */ }
-
-      // Bind colour variable to the Colour fill frame
-      try {
-        var colourFrame = inst.findOne(function(n) { return n.name === 'Colour'; });
-        if (colourFrame) {
-          var colorFill = { type: 'SOLID', color: { r: res.rgba.r, g: res.rgba.g, b: res.rgba.b }, opacity: res.rgba.a };
-          var bf = figma.variables.setBoundVariableForPaint(colorFill, 'color', v);
-          colourFrame.fills = [bf];
-        }
-      } catch(e) { /* variable bind failed */ }
-
-      count++;
-    }
-
-  } catch(e) {
-    await figma.loadFontAsync({ family: 'Inter', style: 'Regular' });
-    var errT = figma.createText();
-    try { errT.fontName = { family: 'Inter', style: 'Regular' }; } catch(e2) {}
-    errT.fontSize = 12;
-    errT.characters = 'Error: ' + String(e);
-    errT.fills = [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 } }];
-    errT.textAutoResize = 'WIDTH_AND_HEIGHT';
-    outer.appendChild(errT);
-  }
-
-  figma.currentPage.appendChild(outer);
-  figma.viewport.scrollAndZoomIntoView([outer]);
-}
-
-
-// ══════════════════════════════════════════════════════════════════════════════
 // UPDATE PRIMITIVES — targets 📋 Doc/Colour/Primitives inside the stylesheet
 // Clears Primitives child, rebuilds with 📋 Doc/Colour component instances
 // ══════════════════════════════════════════════════════════════════════════════
 async function updatePrimitivesFrame() {
   // Find the stylesheet section
   var section = figma.currentPage.findOne(function(n) {
-    return n.type === 'SECTION' && n.name.indexOf('Style sheet') !== -1;
+    return n.type === 'SECTION' && (n.name.indexOf('Style sheet') !== -1 || n.name.indexOf('style sheet') !== -1);
   });
   if (!section) throw new Error('Could not find Style sheet section on this page');
 
