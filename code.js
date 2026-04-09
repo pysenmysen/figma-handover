@@ -1,7 +1,7 @@
 // Grebbans Handover — v7.0
 
 var VERSION = '7.0';
-var FRAME_W = 1164;
+var FRAME_W = 1504;
 
 var KEYS = {
   docModule:       '8df1ea68f02f91062978acb1ccbab2cec2e92171',
@@ -156,16 +156,16 @@ function isSemantic(col) {
   return t > 0 && a / t > 0.5;
 }
 
-// Find existing frame — top-level only (page direct children + inside sections)
+// Find existing frame — page top level + one level inside sections
+// Does NOT search deeper to avoid finding inner frames like 'Primitives' inside wrappers
 function findExistingFrame(name) {
-  // Check direct page children first
   for (var i = 0; i < figma.currentPage.children.length; i++) {
     var n = figma.currentPage.children[i];
     if (n.type === 'FRAME' && n.name === name) return n;
-    // Also check inside sections
     if (n.type === 'SECTION') {
       for (var j = 0; j < n.children.length; j++) {
-        if (n.children[j].type === 'FRAME' && n.children[j].name === name) return n.children[j];
+        var child = n.children[j];
+        if (child.type === 'FRAME' && child.name === name) return child;
       }
     }
   }
@@ -202,7 +202,7 @@ function placeFrame(frame) {
 // PRIMITIVES — uses 📋 Doc/Colour component instances
 // ══════════════════════════════════════════════════════════════════════════════
 async function buildPrimitivesFrame(col) {
-  var OUTER_NAME = col.name; // Keep same name for findExistingFrame
+  var OUTER_NAME = '📋 Colour/' + col.name; // Unique name, won't clash with inner frames
   var colComp = await figma.importComponentByKeyAsync(KEYS.colourPrimitive);
 
   var outer = findExistingFrame(OUTER_NAME);
