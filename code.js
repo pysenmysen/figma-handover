@@ -13,7 +13,7 @@ var KEYS = {
   effectCard:      'a5208d18e7106e3133b9c8cad9fbf2d72138864a',
   sectionOther:    'eb7778ad03fc3564e5b9c25cdeae1743a5233402',
   sectionOption:   'fcd2f3c2808271c76d581b54e0cea7679c9fee3d',
-  typographyStyle: '9d4013dacec5710e27d8612265ebde737efe8279', // Typography/Style Type=Primary
+  typographyStyle: '39f846162ae664e4774bb26add863e258b437bb1', // Typography/Style Type=Primary
   slotsDatapoints: 'ad778223387dceae3c70f6960381248b08df782a', // Slots/Datapoints State=Default
   slotsDataRow:    '98522e2f7df75b6a59071e8f910f91059ad21ec8', // Slots/Datapoints/DataRow Type=Default
 };
