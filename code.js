@@ -37,19 +37,30 @@ figma.showUI(__html__, { width: 480, height: 600, themeColors: true });
     });
   });
 
-  // Check styles
-  var effectStyles = figma.getLocalEffectStyles();
+  // Check gradients
   var paintStyles = figma.getLocalPaintStyles();
   var gradCount = paintStyles.filter(function(s) {
     return s.paints && s.paints.some(function(p) { return p.type.indexOf('GRADIENT') !== -1; });
   }).length;
-  if (effectStyles.length + gradCount > 0) {
+  if (gradCount > 0) {
+    items.push({
+      id: 'gradients',
+      name: 'Gradients',
+      meta: gradCount + ' gradient styles',
+      kind: 'gradients',
+      exists: !!figma.currentPage.findOne(function(n) { return n.type === 'FRAME' && n.name === 'Gradients'; })
+    });
+  }
+
+  // Check effects
+  var effectStyles = figma.getLocalEffectStyles();
+  if (effectStyles.length > 0) {
     items.push({
       id: 'effects',
-      name: 'Effects & Gradients',
-      meta: (effectStyles.length + gradCount) + ' styles',
-      kind: 'styles',
-      exists: !!figma.currentPage.findOne(function(n) { return n.type === 'FRAME' && n.name === 'Effects & Gradients'; })
+      name: 'Effects',
+      meta: effectStyles.length + ' effect styles',
+      kind: 'effects',
+      exists: !!figma.currentPage.findOne(function(n) { return n.type === 'FRAME' && n.name === 'Effects'; })
     });
   }
 
@@ -104,7 +115,8 @@ var LOADED_FONT = null;
 
 // ─── Route to correct builder ─────────────────────────────────────────────────
 async function buildTarget(id, collectionMap) {
-  if (id === 'effects') { buildStylesFrame(); return; }
+  if (id === 'gradients') { await buildGradientsFrame(); return; }
+  if (id === 'effects') { await buildEffectsFrame(); return; }
   if (id === 'typography') { buildTypography(); return; }
   // Collection
   var col = figma.variables.getVariableCollectionById(id);
@@ -476,14 +488,11 @@ async function buildThemesFrame(col) {
 
 
 // ══════════════════════════════════════════════════════════════════════════════
-// EFFECTS & GRADIENTS — real component instances, same pattern as primitives
+// GRADIENTS — real Doc/Gradient component instances
 // ══════════════════════════════════════════════════════════════════════════════
-async function buildStylesFrame() {
-  var OUTER_NAME = 'Effects & Gradients';
-  var effectStyles = figma.getLocalEffectStyles();
-  var paintStyles  = figma.getLocalPaintStyles();
-
-  // Collect gradients
+async function buildGradientsFrame() {
+  var OUTER_NAME = 'Gradients';
+  var paintStyles = figma.getLocalPaintStyles();
   var gradients = [];
   paintStyles.forEach(function(ps) {
     var isGrad = ps.paints && ps.paints.some(function(p) { return p.type.indexOf('GRADIENT') !== -1; });
@@ -491,22 +500,9 @@ async function buildStylesFrame() {
     var parts = ps.name.split('/');
     gradients.push({ style: ps, group: parts.length > 1 ? parts.slice(0,-1).join('/') : '', name: parts[parts.length-1] });
   });
+  if (!gradients.length) return;
 
-  // Collect effects
-  var effects = [];
-  effectStyles.forEach(function(es) {
-    if (!es.effects || !es.effects.length) return;
-    var parts = es.name.split('/');
-    effects.push({ style: es, group: parts.length > 1 ? parts.slice(0,-1).join('/') : '', name: parts[parts.length-1] });
-  });
-
-  if (!gradients.length && !effects.length) return;
-
-  // Import components
-  var gradComp   = await figma.importComponentByKeyAsync(KEYS.gradientCard);
-  var effectComp = await figma.importComponentByKeyAsync(KEYS.effectCard);
-
-  // Find or create outer frame
+  var gradComp = await figma.importComponentByKeyAsync(KEYS.gradientCard);
   var outer = findExistingFrame(OUTER_NAME);
   var isNew = !outer;
   if (isNew) {
@@ -522,7 +518,6 @@ async function buildStylesFrame() {
     outer.resize(FRAME_W, 100);
   }
 
-  // Add Doc/Module only on first generate
   if (isNew) {
     try {
       var docComp = await figma.importComponentByKeyAsync(KEYS.docModule);
@@ -530,8 +525,8 @@ async function buildStylesFrame() {
       outer.appendChild(docInst);
       var docProps = {
         'Epic#134:14': 'Styles',
-        'Instance/State#134:16': 'Effects & Gradients',
-        'Purpose#134:18': 'Paint styles (gradients) and effect styles used across the project.',
+        'Instance/State#134:16': 'Gradients',
+        'Purpose#134:18': 'Gradient paint styles used across the project.',
       };
       try {
         var dp = docInst.componentProperties;
@@ -547,131 +542,139 @@ async function buildStylesFrame() {
     } catch(e) {}
   }
 
-  // Find or create content frame
-  var content = outer.findOne(function(n) { return n.name === 'Styles' && n.type === 'FRAME'; });
-  if (!content) {
-    content = figma.createFrame();
-    content.name = 'Styles';
-    outer.appendChild(content);
-  }
+  var content = outer.findOne(function(n) { return n.name === 'GradientStyles' && n.type === 'FRAME'; });
+  if (!content) { content = figma.createFrame(); content.name = 'GradientStyles'; outer.appendChild(content); }
   while (content.children.length > 0) content.children[content.children.length-1].remove();
   content.fills = []; content.clipsContent = false;
-  content.layoutMode = 'VERTICAL'; content.itemSpacing = 16;
-  content.primaryAxisSizingMode = 'AUTO';
-  content.counterAxisSizingMode = 'FIXED';
-  var contentW = FRAME_W - 320 - 20;
-  content.resize(contentW, 100);
+  content.layoutMode = 'HORIZONTAL'; content.layoutWrap = 'WRAP';
+  content.itemSpacing = 4; content.counterAxisSpacing = 4;
+  content.primaryAxisSizingMode = 'FIXED'; content.counterAxisSizingMode = 'AUTO';
+  content.resize(FRAME_W - 320 - 20, 100);
 
-  // ── Build gradient group ────────────────────────────────────────────────────
-  if (gradients.length) {
-    var gf = figma.createFrame();
-    gf.name = 'Gradients'; gf.fills = [];
-    gf.layoutMode = 'HORIZONTAL'; gf.layoutWrap = 'WRAP';
-    gf.itemSpacing = 4; gf.counterAxisSpacing = 4;
-    gf.primaryAxisSizingMode = 'FIXED'; gf.counterAxisSizingMode = 'AUTO';
-    gf.layoutAlign = 'STRETCH';
-    content.appendChild(gf);
-
-    for (var gi = 0; gi < gradients.length; gi++) {
-      var grad = gradients[gi];
-      var inst = gradComp.createInstance();
-      gf.appendChild(inst);
-
-      // children[0] = Style frame → children[1] = Style fill frame
-      try {
-        var styleFrame = inst.children[0].children[1]; // Style fill frame
-        if (styleFrame) styleFrame.fills = grad.style.paints;
-      } catch(e) {}
-
-      // children[1] = NameHex → children[0] = Name → [0]=Group, [1]=StyleName
-      try {
-        var nameFrame = inst.children[1].children[0];
-        var groupT = nameFrame.children[0];
-        var styleT = nameFrame.children[1];
-        if (groupT && groupT.type === 'TEXT') groupT.characters = grad.group || ' ';
-        if (styleT && styleT.type === 'TEXT') styleT.characters = grad.name;
-      } catch(e) {}
-
-      // children[1] → children[1] = Hex+Opacity → Semantic01, Semantic02
-      try {
-        var hexFrame = inst.children[1].children[1];
-        var stops = [];
-        grad.style.paints.forEach(function(p) {
-          if (p.gradientStops) p.gradientStops.forEach(function(s) {
-            if (s.boundVariables && s.boundVariables.color) {
-              var v = figma.variables.getVariableById(s.boundVariables.color.id);
-              if (v) stops.push(v);
-            }
-          });
+  for (var gi = 0; gi < gradients.length; gi++) {
+    var grad = gradients[gi];
+    var inst = gradComp.createInstance();
+    content.appendChild(inst);
+    try { inst.children[0].children[1].fills = grad.style.paints; } catch(e) {}
+    try {
+      var nm = inst.children[1].children[0];
+      if (nm.children[0].type === 'TEXT') nm.children[0].characters = grad.group || ' ';
+      if (nm.children[1].type === 'TEXT') nm.children[1].characters = grad.name;
+    } catch(e) {}
+    try {
+      var hexF = inst.children[1].children[1];
+      var stops = [];
+      grad.style.paints.forEach(function(p) {
+        if (p.gradientStops) p.gradientStops.forEach(function(s) {
+          if (s.boundVariables && s.boundVariables.color) {
+            var v = figma.variables.getVariableById(s.boundVariables.color.id);
+            if (v) stops.push(v);
+          }
         });
-        for (var si = 0; si < Math.min(stops.length, hexFrame.children.length); si++) {
-          var cellInst = hexFrame.children[si];
-          var v = stops[si];
-          // Colour fill = children[0].children[1]
-          try {
-            var colFill = cellInst.children[0].children[1];
-            var vCollection = figma.variables.getVariableCollectionById(v.variableCollectionId);
-            var modeId = vCollection ? vCollection.defaultModeId : null;
-            var raw = modeId ? v.valuesByMode[modeId] : v.valuesByMode[Object.keys(v.valuesByMode)[0]];
-            var res = raw ? resolveColor(raw, modeId) : null;
-            if (colFill && res) {
-              var cf = { type: 'SOLID', color: { r: res.rgba.r, g: res.rgba.g, b: res.rgba.b }, opacity: res.rgba.a };
-              colFill.fills = [figma.variables.setBoundVariableForPaint(cf, 'color', v)];
-            }
-          } catch(e) {}
-          // primitive text = children[1]
-          try {
-            var primT = cellInst.children[1];
-            if (primT && primT.type === 'TEXT') {
-              primT.characters = '--' + v.name.replace(/\//g, '-').toLowerCase();
-            }
-          } catch(e) {}
-        }
-      } catch(e) {}
-    }
+      });
+      for (var si = 0; si < Math.min(stops.length, hexF.children.length); si++) {
+        var cell = hexF.children[si];
+        var sv = stops[si];
+        try {
+          var col = figma.variables.getVariableCollectionById(sv.variableCollectionId);
+          var mid = col ? col.defaultModeId : null;
+          var raw = mid ? sv.valuesByMode[mid] : sv.valuesByMode[Object.keys(sv.valuesByMode)[0]];
+          var res = raw ? resolveColor(raw, mid) : null;
+          if (cell.children[0].children[1] && res) {
+            var cf = { type: 'SOLID', color: { r: res.rgba.r, g: res.rgba.g, b: res.rgba.b }, opacity: res.rgba.a };
+            cell.children[0].children[1].fills = [figma.variables.setBoundVariableForPaint(cf, 'color', sv)];
+          }
+        } catch(e) {}
+        try {
+          if (cell.children[1].type === 'TEXT') cell.children[1].characters = '--' + sv.name.replace(/\//g, '-').toLowerCase();
+        } catch(e) {}
+      }
+    } catch(e) {}
+  }
+  placeFrame(outer);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// EFFECTS — real Doc/Effect component instances
+// ══════════════════════════════════════════════════════════════════════════════
+async function buildEffectsFrame() {
+  var OUTER_NAME = 'Effects';
+  var effectStyles = figma.getLocalEffectStyles();
+  var effects = [];
+  effectStyles.forEach(function(es) {
+    if (!es.effects || !es.effects.length) return;
+    var parts = es.name.split('/');
+    effects.push({ style: es, group: parts.length > 1 ? parts.slice(0,-1).join('/') : '', name: parts[parts.length-1] });
+  });
+  if (!effects.length) return;
+
+  var effectComp = await figma.importComponentByKeyAsync(KEYS.effectCard);
+  var outer = findExistingFrame(OUTER_NAME);
+  var isNew = !outer;
+  if (isNew) {
+    outer = figma.createFrame();
+    outer.name = OUTER_NAME;
+    figma.currentPage.appendChild(outer);
+  }
+  outer.fills = []; outer.clipsContent = false;
+  outer.layoutMode = 'HORIZONTAL'; outer.itemSpacing = 20;
+  if (isNew) {
+    outer.primaryAxisSizingMode = 'FIXED';
+    outer.counterAxisSizingMode = 'AUTO';
+    outer.resize(FRAME_W, 100);
   }
 
-  // ── Build effects group ─────────────────────────────────────────────────────
-  if (effects.length) {
-    var ef = figma.createFrame();
-    ef.name = 'Effects'; ef.fills = [];
-    ef.layoutMode = 'HORIZONTAL'; ef.layoutWrap = 'WRAP';
-    ef.itemSpacing = 4; ef.counterAxisSpacing = 4;
-    ef.primaryAxisSizingMode = 'FIXED'; ef.counterAxisSizingMode = 'AUTO';
-    ef.layoutAlign = 'STRETCH';
-    content.appendChild(ef);
-
-    for (var ei = 0; ei < effects.length; ei++) {
-      var eff = effects[ei];
-      var einst = effectComp.createInstance();
-      ef.appendChild(einst);
-
-      // children[0] = Style frame → children[1] = Effect fill frame
+  if (isNew) {
+    try {
+      var docComp = await figma.importComponentByKeyAsync(KEYS.docModule);
+      var docInst = docComp.createInstance();
+      outer.appendChild(docInst);
+      var docProps = {
+        'Epic#134:14': 'Styles',
+        'Instance/State#134:16': 'Effects',
+        'Purpose#134:18': 'Effect styles (shadows and blurs) used across the project.',
+      };
       try {
-        var effFrame = einst.children[0].children[1];
-        if (effFrame) {
-          effFrame.fills = [{ type: 'SOLID', color: { r: 0.9, g: 0.9, b: 0.9 } }];
-          effFrame.effects = eff.style.effects;
-        }
+        var dp = docInst.componentProperties;
+        Object.keys(dp).forEach(function(k) {
+          if (dp[k].type === 'BOOLEAN') {
+            var kl = k.toLowerCase();
+            if (kl.indexOf('section') !== -1 || kl.indexOf('data') !== -1) docProps[k] = false;
+            if (kl.indexOf('purpose') !== -1) docProps[k] = true;
+          }
+        });
       } catch(e) {}
-
-      // children[1] = NameHex → children[0] = Name → [0]=Type, [1]=StyleName
-      try {
-        var effNameFrame = einst.children[1].children[0];
-        var typeT = effNameFrame.children[0];
-        var nameT = effNameFrame.children[1];
-        if (typeT && typeT.type === 'TEXT') typeT.characters = eff.group || ' ';
-        if (nameT && nameT.type === 'TEXT') nameT.characters = eff.name;
-      } catch(e) {}
-
-      // children[1] → children[1] = Value text (CSS)
-      try {
-        var valT = einst.children[1].children[1];
-        if (valT && valT.type === 'TEXT') valT.characters = effectToCss(eff.style.effects) || '—';
-      } catch(e) {}
-    }
+      docInst.setProperties(docProps);
+    } catch(e) {}
   }
 
+  var content = outer.findOne(function(n) { return n.name === 'EffectStyles' && n.type === 'FRAME'; });
+  if (!content) { content = figma.createFrame(); content.name = 'EffectStyles'; outer.appendChild(content); }
+  while (content.children.length > 0) content.children[content.children.length-1].remove();
+  content.fills = []; content.clipsContent = false;
+  content.layoutMode = 'HORIZONTAL'; content.layoutWrap = 'WRAP';
+  content.itemSpacing = 4; content.counterAxisSpacing = 4;
+  content.primaryAxisSizingMode = 'FIXED'; content.counterAxisSizingMode = 'AUTO';
+  content.resize(FRAME_W - 320 - 20, 100);
+
+  for (var ei = 0; ei < effects.length; ei++) {
+    var eff = effects[ei];
+    var einst = effectComp.createInstance();
+    content.appendChild(einst);
+    try {
+      var effFrame = einst.children[0].children[1];
+      if (effFrame) { effFrame.fills = [{ type:'SOLID', color:{r:0.9,g:0.9,b:0.9} }]; effFrame.effects = eff.style.effects; }
+    } catch(e) {}
+    try {
+      var nm = einst.children[1].children[0];
+      if (nm.children[0].type === 'TEXT') nm.children[0].characters = eff.group || ' ';
+      if (nm.children[1].type === 'TEXT') nm.children[1].characters = eff.name;
+    } catch(e) {}
+    try {
+      var valT = einst.children[1].children[1];
+      if (valT && valT.type === 'TEXT') valT.characters = effectToCss(eff.style.effects) || '—';
+    } catch(e) {}
+  }
   placeFrame(outer);
 }
 
