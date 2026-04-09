@@ -224,12 +224,25 @@ async function buildPrimitivesFrame(col) {
       var docComp = await figma.importComponentByKeyAsync(KEYS.docModule);
       var docInst = docComp.createInstance();
       outer.appendChild(docInst);
-      docInst.setProperties({
+      // Start with known text properties
+      var docProps = {
         'Epic#134:14': 'Colour',
         'Instance/State#134:16': col.name,
         'Purpose#134:18': 'Primitive colour tokens. Not used directly in project files — applied via semantic variables in themes/modes.',
-        'Data/content2#202:0': false
-      });
+      };
+      // Auto-detect boolean properties and turn OFF sections/data for colour handover
+      try {
+        var instProps = docInst.componentProperties;
+        Object.keys(instProps).forEach(function(k) {
+          if (instProps[k].type === 'BOOLEAN') {
+            var kl = k.toLowerCase();
+            if (kl.indexOf('section') !== -1 || kl.indexOf('data') !== -1) {
+              docProps[k] = false;
+            }
+          }
+        });
+      } catch(e2) {}
+      docInst.setProperties(docProps);
     } catch(e) {}
   }
 
