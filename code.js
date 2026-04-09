@@ -328,7 +328,7 @@ async function buildTypography() {
     try {
       var sectionsSlot = null;
       for (var ci = 0; ci < docInst.children.length; ci++) {
-        if (docInst.children[ci].type === 'SLOT') { sectionsSlot = docInst.children[ci]; break; }
+        if (docInst.children[ci].name === 'Sections') { sectionsSlot = docInst.children[ci]; break; }
       }
       if (sectionsSlot) {
         while (sectionsSlot.children.length > 0) sectionsSlot.children[sectionsSlot.children.length - 1].remove();
@@ -339,7 +339,7 @@ async function buildTypography() {
         // Find Datapoints slot within Slots/Datapoints
         var dpSlot = null;
         for (var di = 0; di < dpInst.children.length; di++) {
-          if (dpInst.children[di].type === 'SLOT') { dpSlot = dpInst.children[di]; break; }
+          if (dpInst.children[di].name === 'Datapoints') { dpSlot = dpInst.children[di]; break; }
         }
         if (dpSlot) {
           while (dpSlot.children.length > 0) dpSlot.children[dpSlot.children.length - 1].remove();
@@ -387,7 +387,7 @@ async function buildTypography() {
       var content = variantType === 'Primary'
         ? 'Primary\nSecond line'
         : variantType === 'Secondary'
-        ? 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.\nCommodo adipiscing et in vitae auctor diam amet, est est.'
+        ? 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nisi, gravida mauris ut lectus blandit tortor hendrerit. Commodo adipiscing et in vitae auctor diam amet, est est.'
         : 'Label';
 
       try {
