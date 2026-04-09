@@ -555,7 +555,7 @@ async function buildGradientsFrame() {
     var grad = gradients[gi];
     var inst = gradComp.createInstance();
     content.appendChild(inst);
-    try { inst.children[0].children[1].fills = grad.style.paints; } catch(e) {}
+    try { inst.children[0].children[1].fillStyleId = grad.style.id; } catch(e) {}
     try {
       var nm = inst.children[1].children[0];
       if (nm.children[0].type === 'TEXT') nm.children[0].characters = grad.group || ' ';
@@ -667,7 +667,7 @@ async function buildEffectsFrame() {
       var effFrame = einst.children[0].children[1];
       if (effFrame) {
         effFrame.fills = [{ type: 'SOLID', color: { r: 0.9, g: 0.9, b: 0.9 } }];
-        effFrame.effects = eff.style.effects;
+        effFrame.effectStyleId = eff.style.id;
       }
     } catch(e) {}
 
