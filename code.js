@@ -661,18 +661,74 @@ async function buildEffectsFrame() {
     var eff = effects[ei];
     var einst = effectComp.createInstance();
     content.appendChild(einst);
+
+    // children[0] = Style frame → children[1] = Effect fill frame
     try {
       var effFrame = einst.children[0].children[1];
-      if (effFrame) { effFrame.fills = [{ type:'SOLID', color:{r:0.9,g:0.9,b:0.9} }]; effFrame.effects = eff.style.effects; }
+      if (effFrame) {
+        effFrame.fills = [{ type: 'SOLID', color: { r: 0.9, g: 0.9, b: 0.9 } }];
+        effFrame.effects = eff.style.effects;
+      }
     } catch(e) {}
+
+    // children[1] = NameHex → children[0] = Name → [0]=Type, [1]=StyleName
     try {
       var nm = einst.children[1].children[0];
       if (nm.children[0].type === 'TEXT') nm.children[0].characters = eff.group || ' ';
       if (nm.children[1].type === 'TEXT') nm.children[1].characters = eff.name;
     } catch(e) {}
+
+    // children[1] → children[1] = value frame → [0]=css-value text, [1]=Semantic instance
     try {
-      var valT = einst.children[1].children[1];
-      if (valT && valT.type === 'TEXT') valT.characters = effectToCss(eff.style.effects) || '—';
+      var valFrame = einst.children[1].children[1];
+      // css-value text
+      var cssT = valFrame.children[0];
+      if (cssT && cssT.type === 'TEXT') cssT.characters = effectToCss(eff.style.effects) || '—';
+
+      // Semantic colour instance — bind shadow colour variable if available
+      var semInst = valFrame.children[1];
+      if (semInst) {
+        var shadowColourVar = null;
+        eff.style.effects.forEach(function(fx) {
+          if (!shadowColourVar && fx.boundVariables && fx.boundVariables.color) {
+            shadowColourVar = figma.variables.getVariableById(fx.boundVariables.color.id);
+          }
+        });
+
+        if (shadowColourVar) {
+          try { semInst.setProperties({ 'Variable?#229:95': true }); } catch(e) {}
+          // Colour fill = children[0].children[1]
+          try {
+            var col2 = figma.variables.getVariableCollectionById(shadowColourVar.variableCollectionId);
+            var mid2 = col2 ? col2.defaultModeId : null;
+            var raw2 = mid2 ? shadowColourVar.valuesByMode[mid2] : shadowColourVar.valuesByMode[Object.keys(shadowColourVar.valuesByMode)[0]];
+            var res2 = raw2 ? resolveColor(raw2, mid2) : null;
+            var colFrame2 = semInst.children[0].children[1];
+            if (colFrame2 && res2) {
+              var cf2 = { type: 'SOLID', color: { r: res2.rgba.r, g: res2.rgba.g, b: res2.rgba.b }, opacity: res2.rgba.a };
+              colFrame2.fills = [figma.variables.setBoundVariableForPaint(cf2, 'color', shadowColourVar)];
+            }
+          } catch(e) {}
+          // primitive text = children[1]
+          try {
+            var primT2 = semInst.children[1];
+            if (primT2 && primT2.type === 'TEXT') {
+              primT2.characters = '--' + shadowColourVar.name.replace(/\//g, '-').toLowerCase();
+            }
+          } catch(e) {}
+        } else {
+          // No variable — show resolved RGBA from effect colour
+          try { semInst.setProperties({ 'Variable?#229:95': false }); } catch(e) {}
+          var firstEffect = eff.style.effects[0];
+          if (firstEffect && firstEffect.color) {
+            try {
+              var ec = firstEffect.color;
+              var ecFill = semInst.children[0].children[1];
+              if (ecFill) ecFill.fills = [{ type: 'SOLID', color: { r: ec.r, g: ec.g, b: ec.b }, opacity: ec.a }];
+            } catch(e) {}
+          }
+        }
+      }
     } catch(e) {}
   }
   placeFrame(outer);
