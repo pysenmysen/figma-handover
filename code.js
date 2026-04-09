@@ -487,6 +487,23 @@ async function buildThemesFrame(col) {
 }
 
 
+function effectToCss(effects) {
+  var parts = [];
+  effects.forEach(function(e) {
+    if (!e.visible) return;
+    if (e.type === 'DROP_SHADOW' || e.type === 'INNER_SHADOW') {
+      var cl = e.color;
+      var inset = e.type === 'INNER_SHADOW' ? 'inset ' : '';
+      var spread = e.spread !== undefined ? e.spread : 0;
+      parts.push(inset + e.offset.x + 'px ' + e.offset.y + 'px ' + e.radius + 'px ' + spread + 'px rgba(' +
+        Math.round(cl.r*255) + ',' + Math.round(cl.g*255) + ',' + Math.round(cl.b*255) + ',' + Math.round(cl.a*100)/100 + ')');
+    } else if (e.type === 'LAYER_BLUR' || e.type === 'BACKGROUND_BLUR') {
+      parts.push('blur(' + e.radius + 'px)');
+    }
+  });
+  return parts.join(', ');
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // GRADIENTS — real Doc/Gradient component instances
 // ══════════════════════════════════════════════════════════════════════════════
@@ -676,7 +693,18 @@ async function buildEffectsFrame() {
     // children[1] = NameHex → children[0] = Name → [0]=Type, [1]=StyleName
     try {
       var nm = einst.children[1].children[0];
-      if (nm.children[0].type === 'TEXT') nm.children[0].characters = eff.group || ' ';
+      // Determine effect type label
+      var effTypeLabel = '';
+      if (eff.style.effects[0]) {
+        var et = eff.style.effects[0].type;
+        if (et === 'DROP_SHADOW') effTypeLabel = 'Drop shadow';
+        else if (et === 'INNER_SHADOW') effTypeLabel = 'Inner shadow';
+        else if (et === 'LAYER_BLUR') effTypeLabel = 'Layer blur';
+        else if (et === 'BACKGROUND_BLUR') effTypeLabel = 'Background blur';
+      }
+      // Type row: "Drop shadow" or "Drop shadow · Group"
+      var typeStr = eff.group ? effTypeLabel + ' · ' + eff.group : effTypeLabel;
+      if (nm.children[0].type === 'TEXT') nm.children[0].characters = typeStr || ' ';
       if (nm.children[1].type === 'TEXT') nm.children[1].characters = eff.name;
     } catch(e) {}
 
@@ -699,33 +727,30 @@ async function buildEffectsFrame() {
 
         if (shadowColourVar) {
           try { semInst.setProperties({ 'Variable?#229:95': true }); } catch(e) {}
-          // Colour fill = children[0].children[1]
           try {
             var col2 = figma.variables.getVariableCollectionById(shadowColourVar.variableCollectionId);
             var mid2 = col2 ? col2.defaultModeId : null;
             var raw2 = mid2 ? shadowColourVar.valuesByMode[mid2] : shadowColourVar.valuesByMode[Object.keys(shadowColourVar.valuesByMode)[0]];
             var res2 = raw2 ? resolveColor(raw2, mid2) : null;
-            var colFrame2 = semInst.children[0].children[1];
-            if (colFrame2 && res2) {
+            // findOne is more reliable for nested instances
+            var colFill2 = semInst.findOne(function(n) { return n.name === 'Colour'; });
+            if (colFill2 && res2) {
               var cf2 = { type: 'SOLID', color: { r: res2.rgba.r, g: res2.rgba.g, b: res2.rgba.b }, opacity: res2.rgba.a };
-              colFrame2.fills = [figma.variables.setBoundVariableForPaint(cf2, 'color', shadowColourVar)];
+              colFill2.fills = [figma.variables.setBoundVariableForPaint(cf2, 'color', shadowColourVar)];
             }
           } catch(e) {}
-          // primitive text = children[1]
           try {
-            var primT2 = semInst.children[1];
-            if (primT2 && primT2.type === 'TEXT') {
-              primT2.characters = '--' + shadowColourVar.name.replace(/\//g, '-').toLowerCase();
-            }
+            var primT2 = semInst.findOne(function(n) { return n.name === 'primitive'; });
+            if (primT2) primT2.characters = '--' + shadowColourVar.name.replace(/\//g, '-').toLowerCase();
           } catch(e) {}
         } else {
-          // No variable — show resolved RGBA from effect colour
+          // No variable — show raw colour from effect
           try { semInst.setProperties({ 'Variable?#229:95': false }); } catch(e) {}
-          var firstEffect = eff.style.effects[0];
-          if (firstEffect && firstEffect.color) {
+          var firstFx = eff.style.effects[0];
+          if (firstFx && firstFx.color) {
             try {
-              var ec = firstEffect.color;
-              var ecFill = semInst.children[0].children[1];
+              var ec = firstFx.color;
+              var ecFill = semInst.findOne(function(n) { return n.name === 'Colour'; });
               if (ecFill) ecFill.fills = [{ type: 'SOLID', color: { r: ec.r, g: ec.g, b: ec.b }, opacity: ec.a }];
             } catch(e) {}
           }
