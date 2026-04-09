@@ -222,10 +222,12 @@ async function buildPrimitivesFrame(col) {
   }
   outer.fills = []; outer.clipsContent = false;
   outer.layoutMode = 'HORIZONTAL'; outer.itemSpacing = 20;
-  // HORIZONTAL layout: primaryAxis=WIDTH, counterAxis=HEIGHT
-  outer.primaryAxisSizingMode = 'FIXED'; // fixed width
-  outer.counterAxisSizingMode = 'AUTO';  // hug height
-  outer.resize(FRAME_W, 100); // width locked, height will hug content
+  if (isNew) {
+    // Only set sizing on first generate — never reset on update
+    outer.primaryAxisSizingMode = 'FIXED'; // fixed width
+    outer.counterAxisSizingMode = 'AUTO';  // hug height
+    outer.resize(FRAME_W, 100);
+  }
 
   // Add Doc/Module only on first generate — never touch on update
   if (isNew) {
