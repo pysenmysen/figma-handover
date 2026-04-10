@@ -10,6 +10,7 @@ var FILES = [
   'src/colours.js',
   'src/typography.js',
   'src/grid.js',
+  'src/documentation.js',
   'src/main.js',
 ];
 

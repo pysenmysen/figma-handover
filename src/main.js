@@ -41,7 +41,15 @@ figma.showUI(__html__, { width: 380, height: 480, themeColors: true });
   }
 
   figma.ui.postMessage({ type: 'init', items: items, version: VERSION });
+
+  // Post current selection to Documentation tab
+  figma.ui.postMessage({ type: 'selection', items: getSelectionInfo() });
 })();
+
+// Update Documentation tab when selection changes
+figma.on('selectionchange', function() {
+  figma.ui.postMessage({ type: 'selection', items: getSelectionInfo() });
+});
 
 // ============================================================
 // MESSAGE HANDLER
@@ -61,6 +69,10 @@ figma.ui.onmessage = async function(msg) {
     }
     if (errors.length > 0) figma.ui.postMessage({ type: 'error', message: 'Errors: ' + errors.join(' | ') });
     else figma.ui.postMessage({ type: 'done', all: true });
+  }
+  if (msg.type === 'style-frames') {
+    styleSelectedFrames();
+    figma.ui.postMessage({ type: 'selection', items: getSelectionInfo() });
   }
   if (msg.type === 'close') figma.closePlugin();
 };

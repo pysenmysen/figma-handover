@@ -97,7 +97,7 @@
 
 <div class="tabs">
   <button class="tab active" onclick="switchTab('stylesheet')">Style sheet</button>
-  <button class="tab disabled" onclick="">Documentation (Coming soon)</button>
+  <button class="tab" onclick="switchTab('documentation')">Documentation</button>
 </div>
 
 <!-- MAIN -->
@@ -106,9 +106,26 @@
     <div class="tab-content active" id="tab-stylesheet" ></div>
     <div class="tab-content" id="tab-handover">
       <div class="coming-soon">
-        <div class="coming-soon-icon">◎</div>
-        <div style="font-size:13px;font-weight:500">Handover</div>
-        <div style="font-size:11px">Component and module handover functions coming after Figma write access is available.</div>
+        <div style="font-size:11px;color:var(--muted)">Handover functions coming soon.</div>
+      </div>
+    </div>
+    <div class="tab-content" id="tab-documentation">
+      <div id="doc-empty" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:32px;color:var(--muted);text-align:center">
+        <div style="font-size:22px;opacity:.3">&#9633;</div>
+        <div style="font-size:11px">Select a frame or component on the canvas</div>
+      </div>
+      <div id="doc-selection" style="display:none;flex-direction:column;gap:6px;width:100%;padding:12px 16px">
+        <div style="font-size:10px;color:var(--muted);padding:0 0 2px">Selected</div>
+        <div id="doc-sel-list" style="display:flex;flex-direction:column;gap:4px"></div>
+        <div style="height:8px"></div>
+        <div style="font-size:10px;color:var(--muted);padding:0 0 2px">Actions</div>
+        <div class="section-card" style="flex-direction:column;align-items:flex-start;gap:8px">
+          <div>
+            <div class="section-name">Apply component styling</div>
+            <div class="section-meta">Purple tint fill + auto-layout with 24px padding</div>
+          </div>
+          <button class="btn-gen" onclick="applyStyle()">Apply</button>
+        </div>
       </div>
     </div>
   </div>
@@ -186,7 +203,37 @@ window.onmessage = function(e) {
     show('s-main');
     document.getElementById('footer-note').textContent = 'Error: ' + msg.message;
   }
+
+  if (msg.type === 'selection') {
+    renderSelection(msg.items);
+  }
+
+  if (msg.type === 'style-done') {
+    document.getElementById('footer-note').textContent = 'Styled ' + msg.count + ' frame' + (msg.count !== 1 ? 's' : '') + '.';
+  }
 };
+
+function renderSelection(selItems) {
+  var empty = document.getElementById('doc-empty');
+  var sel = document.getElementById('doc-selection');
+  var list = document.getElementById('doc-sel-list');
+  if (!selItems || !selItems.length) {
+    empty.style.display = 'flex'; sel.style.display = 'none'; return;
+  }
+  empty.style.display = 'none'; sel.style.display = 'flex';
+  list.innerHTML = selItems.map(function(item) {
+    var icon = item.type === 'COMPONENT_SET' ? '&#10022;' : item.type === 'COMPONENT' ? '&#9671;' : '&#9647;';
+    return '<div style="display:flex;align-items:center;gap:8px;background:var(--surface);border:0.5px solid var(--border);border-radius:7px;padding:8px 10px">' +
+      '<span style="font-size:10px;color:var(--muted)">' + icon + '</span>' +
+      '<span style="font-size:11px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(item.name) + '</span>' +
+      '<span style="font-size:9px;color:var(--muted);margin-left:auto;flex-shrink:0">' + esc(item.type) + '</span>' +
+      '</div>';
+  }).join('');
+}
+
+function applyStyle() {
+  parent.postMessage({ pluginMessage: { type: 'style-frames' } }, '*');
+}
 
 function renderList() {
   var stylesheetEl = document.getElementById('tab-stylesheet');
@@ -246,7 +293,11 @@ function buildItem(item) {
   parent.postMessage({ pluginMessage: { type: 'build', id: item.id } }, '*');
 }
 
+var activeTab = 'stylesheet';
 function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.tab').forEach(function(el) { el.classList.remove('active'); });
+  event.target.classList.add('active');
   document.querySelectorAll('.tab-content').forEach(function(el) { el.classList.remove('active'); });
   document.getElementById('tab-' + tab).classList.add('active');
 }
