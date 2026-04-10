@@ -106,6 +106,18 @@ figma.ui.onmessage = async function(msg) {
     }
     figma.ui.postMessage({ type: 'done' });
   }
+  if (msg.type === 'build-all') {
+    await loadFonts();
+    try {
+      for (var bi = 0; bi < msg.ids.length; bi++) {
+        await buildTarget(msg.ids[bi]);
+      }
+    } catch(err) {
+      figma.ui.postMessage({ type: 'error', message: String(err) });
+      return;
+    }
+    figma.ui.postMessage({ type: 'done', all: true });
+  }
   if (msg.type === 'close') figma.closePlugin();
 };
 

@@ -77,6 +77,10 @@
   /* Empty */
   .empty { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; padding:32px; color:var(--muted); text-align:center; }
 
+  .btn-all { font-size:11px; font-weight:500; border-radius:7px; border:none; cursor:pointer; padding:7px 14px; font-family:inherit; background:var(--comp); color:white; white-space:nowrap; transition:background .15s; flex-shrink:0; }
+  .btn-all:hover { background:var(--comp-d); }
+  .btn-all.has-updates { background:var(--green); }
+  .btn-all.has-updates:hover { background:var(--green-d); }
   ::-webkit-scrollbar { width:3px; }
   ::-webkit-scrollbar-thumb { background:var(--border2); border-radius:2px; }
 </style>
@@ -110,6 +114,7 @@
   </div>
   <div class="footer">
     <div class="footer-note" id="footer-note">Style sheet frames are placed on the current page.</div>
+    <button class="btn-all" id="btn-all" onclick="buildAll()">Generate all</button>
   </div>
 </div>
 
@@ -168,15 +173,13 @@ window.onmessage = function(e) {
   }
 
   if (msg.type === 'done') {
-    if (activeItem) activeItem.exists = true;
+    if (msg.all) { items.forEach(function(i) { if (i.tab === 'stylesheet') i.exists = true; }); }
+    else if (activeItem) { activeItem.exists = true; }
     document.getElementById('prog-bar').style.width = '100%';
-    var label = activeItem ? activeItem.name : 'Frames';
+    var label = msg.all ? 'All frames' : (activeItem ? activeItem.name : 'Frames');
     document.getElementById('done-title').textContent = 'Done!';
     document.getElementById('done-sub').textContent = label + ' generated on canvas.';
-    setTimeout(function() {
-      renderList();
-      show('s-done');
-    }, 300);
+    setTimeout(function() { renderList(); updateAllButton(); show('s-done'); }, 300);
   }
 
   if (msg.type === 'error') {
@@ -196,6 +199,7 @@ function renderList() {
     return;
   }
 
+  updateAllButton();
   stylesheetItems.forEach(function(item) {
     var card = document.createElement('div');
     card.className = 'section-card';
@@ -209,6 +213,28 @@ function renderList() {
     card.querySelector('button').onclick = function() { buildItem(item); };
     stylesheetEl.appendChild(card);
   });
+}
+
+function buildAll() {
+  var stylesheetItems = items.filter(function(i) { return i.tab === 'stylesheet'; });
+  if (!stylesheetItems.length) return;
+  var ids = stylesheetItems.map(function(i) { return i.id; });
+  document.getElementById('prog-title').textContent = 'Building all...';
+  document.getElementById('prog-sub').textContent = 'Starting...';
+  document.getElementById('prog-bar').style.width = '5%';
+  show('s-progress');
+  parent.postMessage({ pluginMessage: { type: 'build-all', ids: ids } }, '*');
+}
+
+function updateAllButton() {
+  var btn = document.getElementById('btn-all');
+  if (!btn) return;
+  var stylesheetItems = items.filter(function(i) { return i.tab === 'stylesheet'; });
+  var anyExists = stylesheetItems.some(function(i) { return i.exists; });
+  var allExist = stylesheetItems.length > 0 && stylesheetItems.every(function(i) { return i.exists; });
+  if (allExist) { btn.textContent = 'Update all'; btn.classList.add('has-updates'); }
+  else if (anyExists) { btn.textContent = 'Generate & update'; btn.classList.add('has-updates'); }
+  else { btn.textContent = 'Generate all'; btn.classList.remove('has-updates'); }
 }
 
 function buildItem(item) {
