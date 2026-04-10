@@ -1,4 +1,4 @@
-// Grebbans Handover — v8.0
+// Grebbans Handover - v8.0
 
 var VERSION = '8.2';
 var FRAME_W = 1504;
@@ -20,7 +20,7 @@ var KEYS = {
 
 figma.showUI(__html__, { width: 480, height: 600, themeColors: true });
 
-// ─── Init ────────────────────────────────────────────────────────────────────
+// --- Init --------------------------------------------------------------------
 (async function init() {
   var collections = figma.variables.getLocalVariableCollections();
   var items = [];
@@ -34,7 +34,7 @@ figma.showUI(__html__, { width: 480, height: 600, themeColors: true });
     items.push({
       id: col.id,
       name: col.name,
-      meta: colorCount + ' colours' + (col.modes.length > 1 ? ' · ' + col.modes.length + ' modes' : ''),
+      meta: colorCount + ' colours' + (col.modes.length > 1 ? '  ' + col.modes.length + ' modes' : ''),
       kind: 'collection',
       exists: !!figma.currentPage.findOne(function(n) { return n.type === 'FRAME' && n.name === 'Doc/' + col.name; })
     });
@@ -76,7 +76,7 @@ figma.showUI(__html__, { width: 480, height: 600, themeColors: true });
     items.push({
       id: 'typography',
       name: 'Typography',
-      meta: typoGroupOrder.join(' · '),
+      meta: typoGroupOrder.join('  '),
       kind: 'typography',
       exists: !!figma.currentPage.findOne(function(n) { return n.type === 'FRAME' && n.name === 'Doc/Typography'; })
     });
@@ -107,7 +107,7 @@ figma.showUI(__html__, { width: 480, height: 600, themeColors: true });
     items.push({
       id: 'grid',
       name: 'Grid',
-      meta: gridBps.join(' · '),
+      meta: gridBps.join('  '),
       kind: 'grid',
       exists: !!findExistingFrame('Doc/Grid')
     });
@@ -116,7 +116,7 @@ figma.showUI(__html__, { width: 480, height: 600, themeColors: true });
   figma.ui.postMessage({ type: 'init', items: items, version: VERSION });
 })();
 
-// ─── Message handler ──────────────────────────────────────────────────────────
+// --- Message handler ----------------------------------------------------------
 figma.ui.onmessage = async function(msg) {
   if (msg.type === 'build') {
     var nhStyles = ['Regular', 'Roman', '55 Roman'];
@@ -151,7 +151,7 @@ figma.ui.onmessage = async function(msg) {
 
 var LOADED_FONT = null;
 
-// ─── Route to correct builder ─────────────────────────────────────────────────
+// --- Route to correct builder -------------------------------------------------
 async function buildTarget(id, collectionMap) {
   if (id === 'grid')       { await buildGrid(); return; }
   if (id === 'gradients')  { await buildGradientsFrame(); return; }
@@ -163,7 +163,7 @@ async function buildTarget(id, collectionMap) {
   else await buildPrimitivesFrame(col);
 }
 
-// ─── Shared helpers ───────────────────────────────────────────────────────────
+// --- Shared helpers -----------------------------------------------------------
 var LOADED_FONT = { family: 'Inter', style: 'Regular' };
 
 function makeText(chars, size, r, g, b, a, rightAlign) {
@@ -249,7 +249,7 @@ function placeFrame(frame) {
   figma.viewport.scrollAndZoomIntoView([frame]);
 }
 
-// ─── Typography helpers ───────────────────────────────────────────────────────
+// --- Typography helpers -------------------------------------------------------
 function styleToWeight(fontStyle) {
   var s = (fontStyle || '').toLowerCase();
   if (s.indexOf('thin') !== -1) return '100';
@@ -264,10 +264,10 @@ function styleToWeight(fontStyle) {
 }
 
 function formatLineHeight(lh) {
-  if (!lh || lh.unit === 'AUTO') return '—';
+  if (!lh || lh.unit === 'AUTO') return '-';
   if (lh.unit === 'PERCENT') return Math.round(lh.value) + '%';
   if (lh.unit === 'PIXELS') return Math.round(lh.value) + 'px';
-  return '—';
+  return '-';
 }
 
 function formatLetterSpacing(ls) {
@@ -280,13 +280,13 @@ function formatLetterSpacing(ls) {
   return '0';
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// TYPOGRAPHY — uses Typography/Style component instances
-// ══════════════════════════════════════════════════════════════════════════════
+// ------------------------------------------------------------------------------
+// TYPOGRAPHY - uses Typography/Style component instances
+// ------------------------------------------------------------------------------
 
-// ══════════════════════════════════════════════════════════════════════════════
-// TYPOGRAPHY — uses Typography/Style + Slots/Typography components
-// ══════════════════════════════════════════════════════════════════════════════
+// ------------------------------------------------------------------------------
+// TYPOGRAPHY - uses Typography/Style + Slots/Typography components
+// ------------------------------------------------------------------------------
 async function buildTypography() {
   var textStyles = figma.getLocalTextStyles();
   if (!textStyles.length) return;
@@ -338,7 +338,7 @@ async function buildTypography() {
     secRow.layoutAlign = 'STRETCH';
     outer.appendChild(secRow);
 
-    // ── Font family + unique weights ──────────────────────────────────────────
+    // -- Font family + unique weights ------------------------------------------
     var fontFamily = g.styles[0].fontName ? g.styles[0].fontName.family : '\u2014';
     var seenWeights = {}, weightLines = [];
     g.styles.forEach(function(s) {
@@ -358,7 +358,7 @@ async function buildTypography() {
     weightLines.sort(function(a, b) { return parseInt(a) - parseInt(b); });
     var weightsText = weightLines.join('\n');
 
-    // ── Doc panel ─────────────────────────────────────────────────────────────
+    // -- Doc panel -------------------------------------------------------------
     var docInst = docComp.createInstance();
     secRow.appendChild(docInst);
 
@@ -388,7 +388,7 @@ async function buildTypography() {
         var tsInst = typoSlot.createInstance();
         sectionsSlot.appendChild(tsInst);
 
-        // Row 0 = FontFamily row — Font-family = family name, Font varible = CSS var
+        // Row 0 = FontFamily row - Font-family = family name, Font varible = CSS var
         try {
           var ffRow = tsInst.children[0];
           var cssVar = '--font-' + gKey.toLowerCase();
@@ -401,7 +401,7 @@ async function buildTypography() {
           });
         } catch(e) {}
 
-        // Row 1 = Weights row — find the value text node
+        // Row 1 = Weights row - find the value text node
         try {
           var wtRow = tsInst.children[1];
           var wtText = wtRow.findOne(function(n) { return n.type === 'TEXT' && n.name !== 'Label'; });
@@ -410,7 +410,7 @@ async function buildTypography() {
       }
     } catch(e) {}
 
-    // ── Styles column ─────────────────────────────────────────────────────────
+    // -- Styles column ---------------------------------------------------------
     var isMisc = variantType === 'Misc';
     var colW = FRAME_W - 320 - 16; // 1168px
     var cardW = isMisc ? 582 : colW;
@@ -490,9 +490,9 @@ async function buildTypography() {
 
 
 
-// ══════════════════════════════════════════════════════════════════════════════
-// GRID — Doc/Default + Slots/Grid + column visual per breakpoint
-// ══════════════════════════════════════════════════════════════════════════════
+// ------------------------------------------------------------------------------
+// GRID - Doc/Default + Slots/Grid + column visual per breakpoint
+// ------------------------------------------------------------------------------
 async function buildGrid() {
   // Scan all page frames for COLUMNS layout grids
   var gridData = [], seenW = {};
@@ -519,7 +519,7 @@ async function buildGrid() {
     if (gridData[i].width <= 767) { mob = gridData[i]; break; }
   }
   if (!mob) {
-    figma.ui.postMessage({ type: 'error', message: 'No mobile frame (≤767px) with a column grid guide found on this page.' });
+    figma.ui.postMessage({ type: 'error', message: 'No mobile frame (767px) with a column grid guide found on this page.' });
     return;
   }
 
@@ -546,20 +546,10 @@ async function buildGridBreakpoint(outer, data, label, docComp, gridSlotComp, ot
   var margin   = Math.round(g.offset);
   var colWidth = (w - 2 * margin - (columns - 1) * gutter) / columns;
 
-  var bpMeta = {
-    Mob:    { label: 'Mob (360-768px)',    range: '0 - 767',     purpose: 'Grid for mobile devices. All units should have the same column count.\n\nFor mobile, the design should be scalable to at least 320px for accessibility reasons. Hand over all designs at the same frame size: 360x660px or 390x720px\n\nThis excludes browser and OS UI from the viewport.' },
+  var purpose = 'Grid for mobile devices. All units should have the same column count.\n\nFor mobile, the design should be scalable to at least 320px for accessibility reasons. Hand over all designs at the same frame size: 360x660px or 390x720px\n\nThis excludes browser and OS UI from the viewport.';
 
+  var bpRange  = label === 'Mob' ? '0 - 767' : label === 'Tab' ? '768 - 1279' : label === 'Desk' ? '1280 - 1535' : '1536+';
 
-
-
-
-
-    Tab:    { label: 'Tab (768-1280px)',    range: '768 - 1279',  purpose: 'Grid for tablet viewports.' },
-    Desk:   { label: 'Desk (1280-1536px)', range: '1280 - 1535', purpose: 'Grid for desktop viewports.' },
-    Cinema: { label: 'Cinema (1536px+)',   range: '1536+',       purpose: 'Grid for wide/cinema viewports.' },
-  var bp = bpMeta[label] || { label: label, range: String(w), purpose: '' };
-
-  // Row frame
   var rowFrame = figma.createFrame();
   rowFrame.name = label + 'Grid';
   rowFrame.fills = [];
@@ -569,38 +559,32 @@ async function buildGridBreakpoint(outer, data, label, docComp, gridSlotComp, ot
   rowFrame.layoutAlign = 'STRETCH';
   outer.appendChild(rowFrame);
 
-  // Doc panel
   var docInst = docComp.createInstance();
   rowFrame.appendChild(docInst);
   try {
     docInst.setProperties({
       'Epic#134:14':           'Grid',
-      'Instance/State#134:16': bp.label,
-      'Purpose#134:18':        bp.purpose,
+      'Instance/State#134:16': bpLabel,
+      'Purpose#134:18':        purpose,
       'Show purpose#227:81':   true,
       'Show sections#226:79':  true,
     });
   } catch(e) {}
 
-  // Sections slot → Slots/Grid + Slots/Other
   try {
     var sectionsSlot = docInst.findOne(function(n) { return n.name === 'Sections'; });
     if (sectionsSlot) {
       while (sectionsSlot.children.length > 0) sectionsSlot.children[sectionsSlot.children.length - 1].remove();
-
-      // Slots/Grid
       var gridSlot = gridSlotComp.createInstance();
       sectionsSlot.appendChild(gridSlot);
       try {
         gridSlot.setProperties({
-          'Breakpoint#247:118': bp.range,
+          'Breakpoint#247:118': bpRange,
           'Columns#247:120':    String(columns),
           'Margin#247:122':     margin + 'px',
           'Gutter#247:124':     gutter + 'px',
         });
       } catch(e) {}
-
-      // Slots/Other
       var otherSlot = otherComp.createInstance();
       sectionsSlot.appendChild(otherSlot);
       try { otherSlot.setProperties({ 'Section title#134:20': 'Other' }); } catch(e) {}
@@ -611,7 +595,6 @@ async function buildGridBreakpoint(outer, data, label, docComp, gridSlotComp, ot
     }
   } catch(e) {}
 
-  // Column visual frame
   var vizFrame = figma.createFrame();
   vizFrame.name = 'GridFrame';
   vizFrame.clipsContent = true;
@@ -623,7 +606,6 @@ async function buildGridBreakpoint(outer, data, label, docComp, gridSlotComp, ot
   vizFrame.resize(w, 100);
   rowFrame.appendChild(vizFrame);
 
-  // Draw column rects (absolutley positioned, tall — clipped by parent)
   for (var ci = 0; ci < columns; ci++) {
     var colRect = figma.createRectangle();
     colRect.x = margin + ci * (colWidth + gutter);
@@ -635,154 +617,9 @@ async function buildGridBreakpoint(outer, data, label, docComp, gridSlotComp, ot
   }
 }
 
-function effectToCss(effects) {
-  var parts = [];
-  effects.forEach(function(e) {
-    if (!e.visible) return;
-    if (e.type === 'DROP_SHADOW' || e.type === 'INNER_SHADOW') {
-      var cl = e.color;
-      var inset = e.type === 'INNER_SHADOW' ? 'inset ' : '';
-      var spread = e.spread !== undefined ? e.spread : 0;
-      var colourValue;
-      if (e.boundVariables && e.boundVariables.color) {
-        var bv = figma.variables.getVariableById(e.boundVariables.color.id);
-        colourValue = bv ? 'var(--' + bv.name.replace(/\//g, '-').toLowerCase() + ')' : null;
-      }
-      if (!colourValue) {
-        colourValue = 'rgba(' + Math.round(cl.r*255) + ',' + Math.round(cl.g*255) + ',' + Math.round(cl.b*255) + ',' + Math.round(cl.a*100)/100 + ')';
-      }
-      parts.push(inset + e.offset.x + 'px ' + e.offset.y + 'px ' + e.radius + 'px ' + spread + 'px ' + colourValue);
-    } else if (e.type === 'LAYER_BLUR' || e.type === 'BACKGROUND_BLUR') {
-      parts.push('blur(' + e.radius + 'px)');
-    }
-  });
-  return parts.join(', ');
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// PRIMITIVES
-// ══════════════════════════════════════════════════════════════════════════════
-async function buildPrimitivesFrame(col) {
-  var OUTER_NAME = 'Doc/' + col.name;
-  var colComp = await figma.importComponentByKeyAsync(KEYS.colourPrimitive);
-
-  var outer = findExistingFrame(OUTER_NAME);
-  var isNew = !outer;
-  if (isNew) {
-    outer = figma.createFrame();
-    outer.name = OUTER_NAME;
-    figma.currentPage.appendChild(outer);
-  }
-  outer.fills = []; outer.clipsContent = false;
-  outer.layoutMode = 'HORIZONTAL'; outer.itemSpacing = 20;
-  if (isNew) {
-    outer.primaryAxisSizingMode = 'FIXED';
-    outer.counterAxisSizingMode = 'AUTO';
-    outer.resize(FRAME_W, 100);
-  }
-
-  if (isNew) {
-    try {
-      var docComp = await figma.importComponentByKeyAsync(KEYS.docModule);
-      var docInst = docComp.createInstance();
-      outer.appendChild(docInst);
-      var docProps = {
-        'Epic#134:14': 'Colour',
-        'Instance/State#134:16': col.name,
-        'Purpose#134:18': 'Primitive colour tokens. Not used directly in project files — applied via semantic variables in themes/modes.',
-      };
-      try {
-        var instProps = docInst.componentProperties;
-        Object.keys(instProps).forEach(function(k) {
-          if (instProps[k].type === 'BOOLEAN') {
-            var kl = k.toLowerCase();
-            if (kl.indexOf('section') !== -1 || kl.indexOf('data') !== -1) docProps[k] = false;
-          }
-        });
-      } catch(e2) {}
-      docInst.setProperties(docProps);
-    } catch(e) {}
-  }
-
-  var primContent = outer.findOne(function(n) { return n.name === 'Primitives' && n.type === 'FRAME'; });
-  if (!primContent) {
-    primContent = figma.createFrame();
-    primContent.name = 'Primitives';
-    outer.appendChild(primContent);
-  }
-  while (primContent.children.length > 0) primContent.children[primContent.children.length-1].remove();
-  primContent.fills = []; primContent.clipsContent = false;
-  primContent.layoutMode = 'VERTICAL'; primContent.itemSpacing = 16;
-  var primW = FRAME_W - 320 - 20;
-  primContent.resize(primW, 100);
-  primContent.primaryAxisSizingMode = 'AUTO';
-  primContent.counterAxisSizingMode = 'FIXED';
-
-  var modeId = col.defaultModeId;
-  var groups = {}, groupOrder = [];
-  for (var vi = 0; vi < col.variableIds.length; vi++) {
-    var v = figma.variables.getVariableById(col.variableIds[vi]);
-    if (!v || v.resolvedType !== 'COLOR') continue;
-    var raw = v.valuesByMode[modeId] || v.valuesByMode[Object.keys(v.valuesByMode)[0]];
-    var res = raw ? resolveColor(raw, modeId) : null;
-    if (!res) continue;
-    var parts = v.name.split('/');
-    var gKey = parts.length > 1 ? parts.slice(0,2).join('/') : '__root__';
-    if (!groups[gKey]) { groups[gKey] = { tokens: [] }; groupOrder.push(gKey); }
-    groups[gKey].tokens.push({
-      cssName: '--' + v.name.replace(/\//g, '-').toLowerCase(),
-      variable: v, hex: toHex(res.rgba.r, res.rgba.g, res.rgba.b),
-      alpha: Math.round(res.rgba.a * 100) / 100,
-      r: res.rgba.r, g: res.rgba.g, b: res.rgba.b
-    });
-  }
-
-  for (var gi = 0; gi < groupOrder.length; gi++) {
-    var g = groups[groupOrder[gi]];
-    var gf = figma.createFrame();
-    gf.name = 'VaribleGroup'; gf.fills = [];
-    gf.layoutMode = 'VERTICAL'; gf.itemSpacing = 12;
-    gf.primaryAxisSizingMode = 'AUTO'; gf.counterAxisSizingMode = 'FIXED';
-    gf.layoutAlign = 'STRETCH';
-    primContent.appendChild(gf);
-
-    var vf = figma.createFrame();
-    vf.name = 'Varibles'; vf.fills = [];
-    vf.layoutMode = 'HORIZONTAL'; vf.layoutWrap = 'WRAP';
-    vf.itemSpacing = 4; vf.counterAxisSpacing = 4;
-    vf.primaryAxisSizingMode = 'FIXED'; vf.counterAxisSizingMode = 'AUTO';
-    vf.layoutAlign = 'STRETCH';
-    gf.appendChild(vf);
-
-    for (var ti = 0; ti < g.tokens.length; ti++) {
-      var token = g.tokens[ti];
-      var inst = colComp.createInstance();
-      vf.appendChild(inst);
-      var hasAlpha = token.alpha < 0.99;
-      try {
-        inst.setProperties({
-          'VariantName#221:77': token.cssName,
-          'Hex#221:71': token.hex,
-          'Show Opacity#221:75': hasAlpha,
-          'Opacity#221:73': Math.round(token.alpha * 100) + '%'
-        });
-      } catch(e) {}
-      try {
-        var colourFrame = inst.findOne(function(n) { return n.name === 'Colour'; });
-        if (colourFrame) {
-          var colorFill = { type: 'SOLID', color: { r: token.r, g: token.g, b: token.b }, opacity: token.alpha };
-          colourFrame.fills = [figma.variables.setBoundVariableForPaint(colorFill, 'color', token.variable)];
-        }
-      } catch(e) {}
-    }
-  }
-
-  placeFrame(outer);
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
+// ------------------------------------------------------------------------------
 // THEMES
-// ══════════════════════════════════════════════════════════════════════════════
+// ------------------------------------------------------------------------------
 async function buildThemesFrame(col) {
   var OUTER_NAME = 'Doc/' + col.name;
 
@@ -812,7 +649,7 @@ async function buildThemesFrame(col) {
       var docProps = {
         'Epic#134:14': 'Colour',
         'Instance/State#134:16': col.name,
-        'Purpose#134:18': 'Semantic colour tokens mapped to primitives per mode.\n\nEach column must have its theme applied manually in Figma for the MCP to read the correct resolved colours — variable bindings update automatically when the theme is switched.',
+        'Purpose#134:18': 'Semantic colour tokens mapped to primitives per mode.\n\nEach column must have its theme applied manually in Figma for the MCP to read the correct resolved colours - variable bindings update automatically when the theme is switched.',
       };
       try {
         var dp = docInst.componentProperties;
@@ -900,9 +737,9 @@ async function buildThemesFrame(col) {
   placeFrame(outer);
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
+// ------------------------------------------------------------------------------
 // GRADIENTS
-// ══════════════════════════════════════════════════════════════════════════════
+// ------------------------------------------------------------------------------
 async function buildGradientsFrame() {
   var OUTER_NAME = 'Doc/Gradients';
   var paintStyles = figma.getLocalPaintStyles();
@@ -1007,9 +844,9 @@ async function buildGradientsFrame() {
   placeFrame(outer);
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
+// ------------------------------------------------------------------------------
 // EFFECTS
-// ══════════════════════════════════════════════════════════════════════════════
+// ------------------------------------------------------------------------------
 async function buildEffectsFrame() {
   var OUTER_NAME = 'Doc/Effects';
   var effectStyles = figma.getLocalEffectStyles();
@@ -1095,7 +932,7 @@ async function buildEffectsFrame() {
         else if (et === 'LAYER_BLUR') effTypeLabel = 'Layer blur';
         else if (et === 'BACKGROUND_BLUR') effTypeLabel = 'Background blur';
       }
-      var typeStr = eff.group ? effTypeLabel + ' · ' + eff.group : effTypeLabel;
+      var typeStr = eff.group ? effTypeLabel + '  ' + eff.group : effTypeLabel;
       if (nm.children[0].type === 'TEXT') nm.children[0].characters = typeStr || ' ';
       if (nm.children[1].type === 'TEXT') nm.children[1].characters = eff.name;
     } catch(e) {}
@@ -1103,7 +940,7 @@ async function buildEffectsFrame() {
     try {
       var valFrame = einst.children[1].children[1];
       var cssT = valFrame.children[0];
-      if (cssT && cssT.type === 'TEXT') cssT.characters = effectToCss(eff.style.effects) || '—';
+      if (cssT && cssT.type === 'TEXT') cssT.characters = effectToCss(eff.style.effects) || '-';
 
       var semInst = valFrame.children[1];
       if (semInst) {
