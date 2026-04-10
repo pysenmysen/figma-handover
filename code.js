@@ -1,6 +1,6 @@
 // Grebbans Handover — v8.0
 
-var VERSION = '8.0';
+var VERSION = '8.2';
 var FRAME_W = 1504;
 
 var KEYS = {
@@ -12,6 +12,7 @@ var KEYS = {
   gradientCard:    '6999639649f183fd91d2648853a74606c765c2b6',
   effectCard:      'a5208d18e7106e3133b9c8cad9fbf2d72138864a',
   sectionOther:    'eb7778ad03fc3564e5b9c25cdeae1743a5233402',
+  slotsGrid:       'b0abdcf55797a8770b650c170c96a0e3e32e6f72', // Slots/Grid State=Default
   sectionOption:   'fcd2f3c2808271c76d581b54e0cea7679c9fee3d',
   typographyStyle: '39f846162ae664e4774bb26add863e258b437bb1', // Typography/Style Type=Primary
   typographySlot:  'e0f20829328d45fb0f5de235069bef08a808bca5', // Slots/Typography State=Default
@@ -81,6 +82,37 @@ figma.showUI(__html__, { width: 480, height: 600, themeColors: true });
     });
   }
 
+  // Scan for frames with COLUMNS layout grids
+  var gridBps = [], seenBpW = {};
+  function scanGridFrames(nodes) {
+    for (var i = 0; i < nodes.length; i++) {
+      var n = nodes[i];
+      if (n.type === 'FRAME' && n.layoutGrids && n.layoutGrids.length > 0) {
+        for (var gi = 0; gi < n.layoutGrids.length; gi++) {
+          if (n.layoutGrids[gi].pattern === 'COLUMNS') {
+            var bpW = Math.round(n.width);
+            if (!seenBpW[bpW]) {
+              seenBpW[bpW] = true;
+              gridBps.push(bpW <= 767 ? 'Mob' : bpW <= 1279 ? 'Tab' : bpW <= 1535 ? 'Desk' : 'Cinema');
+            }
+            break;
+          }
+        }
+      }
+      if (n.children && n.type !== 'COMPONENT' && n.type !== 'INSTANCE') scanGridFrames(n.children);
+    }
+  }
+  scanGridFrames(figma.currentPage.children);
+  if (gridBps.length > 0) {
+    items.push({
+      id: 'grid',
+      name: 'Grid',
+      meta: gridBps.join(' · '),
+      kind: 'grid',
+      exists: !!findExistingFrame('Doc/Grid')
+    });
+  }
+
   figma.ui.postMessage({ type: 'init', items: items, version: VERSION });
 })();
 
@@ -121,6 +153,7 @@ var LOADED_FONT = null;
 
 // ─── Route to correct builder ─────────────────────────────────────────────────
 async function buildTarget(id, collectionMap) {
+  if (id === 'grid')       { await buildGrid(); return; }
   if (id === 'gradients')  { await buildGradientsFrame(); return; }
   if (id === 'effects')    { await buildEffectsFrame(); return; }
   if (id === 'typography') { await buildTypography(); return; }
@@ -456,6 +489,151 @@ async function buildTypography() {
 }
 
 
+
+// ══════════════════════════════════════════════════════════════════════════════
+// GRID — Doc/Default + Slots/Grid + column visual per breakpoint
+// ══════════════════════════════════════════════════════════════════════════════
+async function buildGrid() {
+  // Scan all page frames for COLUMNS layout grids
+  var gridData = [], seenW = {};
+  function scanForColumns(nodes) {
+    for (var i = 0; i < nodes.length; i++) {
+      var n = nodes[i];
+      if (n.type === 'FRAME' && n.layoutGrids && n.layoutGrids.length > 0) {
+        for (var gi = 0; gi < n.layoutGrids.length; gi++) {
+          if (n.layoutGrids[gi].pattern === 'COLUMNS') {
+            var w = Math.round(n.width);
+            if (!seenW[w]) { seenW[w] = true; gridData.push({ width: w, grid: n.layoutGrids[gi] }); }
+            break;
+          }
+        }
+      }
+      if (n.children && n.type !== 'COMPONENT' && n.type !== 'INSTANCE') scanForColumns(n.children);
+    }
+  }
+  scanForColumns(figma.currentPage.children);
+
+  // Mobile only for now
+  var mob = null;
+  for (var i = 0; i < gridData.length; i++) {
+    if (gridData[i].width <= 767) { mob = gridData[i]; break; }
+  }
+  if (!mob) {
+    figma.ui.postMessage({ type: 'error', message: 'No mobile frame (≤767px) with a column grid guide found on this page.' });
+    return;
+  }
+
+  var docComp      = await figma.importComponentByKeyAsync(KEYS.docModule);
+  var gridSlotComp = await figma.importComponentByKeyAsync(KEYS.slotsGrid);
+  var otherComp    = await figma.importComponentByKeyAsync(KEYS.sectionOther);
+
+  var outer = getOrCreateFrame('Doc/Grid');
+  outer.fills = []; outer.clipsContent = false;
+  outer.layoutMode = 'VERTICAL'; outer.itemSpacing = 16;
+  outer.counterAxisSizingMode = 'FIXED';
+  outer.primaryAxisSizingMode = 'AUTO';
+  outer.resize(FRAME_W, outer.height || 100);
+
+  await buildGridBreakpoint(outer, mob, 'Mob', docComp, gridSlotComp, otherComp);
+  placeFrame(outer);
+}
+
+async function buildGridBreakpoint(outer, data, label, docComp, gridSlotComp, otherComp) {
+  var g = data.grid;
+  var w = data.width;
+  var columns  = g.count;
+  var gutter   = Math.round(g.gutterSize);
+  var margin   = Math.round(g.offset);
+  var colWidth = (w - 2 * margin - (columns - 1) * gutter) / columns;
+
+  var bpMeta = {
+    Mob:    { label: '📱 Mob (360–768px)',    range: '0 – 767',     purpose: 'Grid for mobile devices. All units should have the same column count.
+
+For mobile, the design should be scalable to at least 320px for accessibility reasons. Hand over all designs at the same frame size:
+360×660px or 390×720px
+
+This excludes browser and OS UI from the viewport.' },
+    Tab:    { label: '🔲 Tab (768–1280px)',   range: '768 – 1279',  purpose: 'Grid for tablet viewports.' },
+    Desk:   { label: '💻 Desk (1280–1536px)', range: '1280 – 1535', purpose: 'Grid for desktop viewports.' },
+    Cinema: { label: '🖥 Cinema (1536px+)',   range: '1536+',       purpose: 'Grid for wide/cinema viewports.' },
+  };
+  var bp = bpMeta[label] || { label: label, range: String(w), purpose: '' };
+
+  // Row frame
+  var rowFrame = figma.createFrame();
+  rowFrame.name = label + 'Grid';
+  rowFrame.fills = [];
+  rowFrame.layoutMode = 'HORIZONTAL'; rowFrame.itemSpacing = 16;
+  rowFrame.primaryAxisSizingMode = 'FIXED';
+  rowFrame.counterAxisSizingMode = 'AUTO';
+  rowFrame.layoutAlign = 'STRETCH';
+  outer.appendChild(rowFrame);
+
+  // Doc panel
+  var docInst = docComp.createInstance();
+  rowFrame.appendChild(docInst);
+  try {
+    docInst.setProperties({
+      'Epic#134:14':           'Grid',
+      'Instance/State#134:16': bp.label,
+      'Purpose#134:18':        bp.purpose,
+      'Show purpose#227:81':   true,
+      'Show sections#226:79':  true,
+    });
+  } catch(e) {}
+
+  // Sections slot → Slots/Grid + Slots/Other
+  try {
+    var sectionsSlot = docInst.findOne(function(n) { return n.name === 'Sections'; });
+    if (sectionsSlot) {
+      while (sectionsSlot.children.length > 0) sectionsSlot.children[sectionsSlot.children.length - 1].remove();
+
+      // Slots/Grid
+      var gridSlot = gridSlotComp.createInstance();
+      sectionsSlot.appendChild(gridSlot);
+      try {
+        gridSlot.setProperties({
+          'Breakpoint#247:118': bp.range,
+          'Columns#247:120':    String(columns),
+          'Margin#247:122':     margin + 'px',
+          'Gutter#247:124':     gutter + 'px',
+        });
+      } catch(e) {}
+
+      // Slots/Other
+      var otherSlot = otherComp.createInstance();
+      sectionsSlot.appendChild(otherSlot);
+      try { otherSlot.setProperties({ 'Section title#134:20': 'Other' }); } catch(e) {}
+      try {
+        var bulletT = otherSlot.findOne(function(n) { return n.name === 'BulletList' && n.type === 'TEXT'; });
+        if (bulletT) bulletT.characters = 'Text fields and other content may have a max-width constraint.';
+      } catch(e) {}
+    }
+  } catch(e) {}
+
+  // Column visual frame
+  var vizFrame = figma.createFrame();
+  vizFrame.name = 'GridFrame';
+  vizFrame.clipsContent = true;
+  vizFrame.fills = [];
+  vizFrame.cornerRadius = 8;
+  vizFrame.layoutAlign = 'STRETCH';
+  vizFrame.primaryAxisSizingMode = 'FIXED';
+  vizFrame.counterAxisSizingMode = 'AUTO';
+  vizFrame.resize(w, 100);
+  rowFrame.appendChild(vizFrame);
+
+  // Draw column rects (absolutley positioned, tall — clipped by parent)
+  for (var ci = 0; ci < columns; ci++) {
+    var colRect = figma.createRectangle();
+    colRect.x = margin + ci * (colWidth + gutter);
+    colRect.y = 0;
+    colRect.resize(colWidth, 2000);
+    colRect.fills = [{ type: 'SOLID', color: { r: 0.54, g: 0.22, b: 0.96 }, opacity: 0.15 }];
+    colRect.cornerRadius = 2;
+    vizFrame.appendChild(colRect);
+  }
+}
 
 function effectToCss(effects) {
   var parts = [];
