@@ -108,15 +108,19 @@ figma.ui.onmessage = async function(msg) {
   }
   if (msg.type === 'build-all') {
     await loadFonts();
-    try {
-      for (var bi = 0; bi < msg.ids.length; bi++) {
+    var errors = [];
+    for (var bi = 0; bi < msg.ids.length; bi++) {
+      try {
         await buildTarget(msg.ids[bi]);
+      } catch(err) {
+        errors.push(msg.ids[bi] + ': ' + String(err));
       }
-    } catch(err) {
-      figma.ui.postMessage({ type: 'error', message: String(err) });
-      return;
     }
-    figma.ui.postMessage({ type: 'done', all: true });
+    if (errors.length > 0) {
+      figma.ui.postMessage({ type: 'error', message: 'Partial errors: ' + errors.join(' | ') });
+    } else {
+      figma.ui.postMessage({ type: 'done', all: true });
+    }
   }
   if (msg.type === 'close') figma.closePlugin();
 };
