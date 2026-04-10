@@ -4,7 +4,7 @@ var VERSION = '8.2';
 var FRAME_W = 1504;
 
 var KEYS = {
-  docModule:       '8df1ea68f02f91062978acb1ccbab2cec2e92171', // 📋 Doc/Default State=Default
+  docModule:       '8df1ea68f02f91062978acb1ccbab2cec2e92171', // Doc/Default State=Default
   colourPrimitive: '0f4a992b74f79d0754a10487640c165f040cf6be',
   themesTable:     '817002b1f661519a99cac808dcf221d48f672289',
   themesCol:       'f48bb2051c1b4c248bbc418baa56ac87e7d0a2ee',
@@ -547,16 +547,16 @@ async function buildGridBreakpoint(outer, data, label, docComp, gridSlotComp, ot
   var colWidth = (w - 2 * margin - (columns - 1) * gutter) / columns;
 
   var bpMeta = {
-    Mob:    { label: '📱 Mob (360–768px)',    range: '0 – 767',     purpose: 'Grid for mobile devices. All units should have the same column count.
+    Mob:    { label: 'Mob (360-768px)',    range: '0 - 767',     purpose: 'Grid for mobile devices. All units should have the same column count.\n\nFor mobile, the design should be scalable to at least 320px for accessibility reasons. Hand over all designs at the same frame size: 360x660px or 390x720px\n\nThis excludes browser and OS UI from the viewport.' },
 
-For mobile, the design should be scalable to at least 320px for accessibility reasons. Hand over all designs at the same frame size:
-360×660px or 390×720px
 
-This excludes browser and OS UI from the viewport.' },
-    Tab:    { label: '🔲 Tab (768–1280px)',   range: '768 – 1279',  purpose: 'Grid for tablet viewports.' },
-    Desk:   { label: '💻 Desk (1280–1536px)', range: '1280 – 1535', purpose: 'Grid for desktop viewports.' },
-    Cinema: { label: '🖥 Cinema (1536px+)',   range: '1536+',       purpose: 'Grid for wide/cinema viewports.' },
-  };
+
+
+
+
+    Tab:    { label: 'Tab (768-1280px)',    range: '768 - 1279',  purpose: 'Grid for tablet viewports.' },
+    Desk:   { label: 'Desk (1280-1536px)', range: '1280 - 1535', purpose: 'Grid for desktop viewports.' },
+    Cinema: { label: 'Cinema (1536px+)',   range: '1536+',       purpose: 'Grid for wide/cinema viewports.' },
   var bp = bpMeta[label] || { label: label, range: String(w), purpose: '' };
 
   // Row frame
