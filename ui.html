@@ -23,49 +23,40 @@
   .logo-name { font-size:12px; font-weight:600; letter-spacing:.05em; text-transform:uppercase; }
   .logo-sub  { font-size:10px; color:var(--muted); }
 
+  /* Tabs */
+  .tabs { display:flex; border-bottom:0.5px solid var(--border2); flex-shrink:0; }
+  .tab { flex:1; padding:9px 0; font-size:11px; font-weight:500; text-align:center; cursor:pointer; color:var(--muted); border:none; background:none; border-bottom:2px solid transparent; transition:all .15s; font-family:inherit; }
+  .tab.active { color:var(--text); border-bottom-color:var(--comp); }
+  .tab.disabled { opacity:.35; cursor:not-allowed; }
+
   /* Screens */
   .screen { flex:1; overflow-y:auto; display:flex; flex-direction:column; }
   .screen.hidden { display:none !important; }
 
-  /* Main list */
+  /* Item list */
   .list-wrap { flex:1; padding:12px 16px; display:flex; flex-direction:column; gap:6px; }
+  .tab-content { display:none; }
+  .tab-content.active { display:flex; flex-direction:column; gap:6px; }
 
-  .section-card {
-    background:var(--surface); border:0.5px solid var(--border);
-    border-radius:10px; padding:10px 12px;
-    display:flex; align-items:center; gap:12px;
-  }
+  /* Cards */
+  .section-card { background:var(--surface); border:0.5px solid var(--border); border-radius:10px; padding:10px 12px; display:flex; align-items:center; gap:12px; }
   .section-info { flex:1; min-width:0; }
   .section-name { font-size:12px; font-weight:500; margin-bottom:2px; }
   .section-meta { font-size:10px; color:var(--muted); }
 
-  .btn-gen {
-    font-size:11px; font-weight:500; border-radius:7px; border:none;
-    cursor:pointer; padding:6px 14px; font-family:inherit;
-    background:var(--comp); color:white; white-space:nowrap; flex-shrink:0;
-    transition:background .15s;
-  }
+  .btn-gen { font-size:11px; font-weight:500; border-radius:7px; border:none; cursor:pointer; padding:6px 14px; font-family:inherit; background:var(--comp); color:white; white-space:nowrap; flex-shrink:0; transition:background .15s; }
   .btn-gen:hover { background:var(--comp-d); }
   .btn-gen.update { background:var(--green); }
   .btn-gen.update:hover { background:var(--green-d); }
   .btn-gen:disabled { opacity:.35; cursor:not-allowed; }
 
   /* Footer */
-  .footer {
-    padding:12px 16px; border-top:0.5px solid var(--border2);
-    display:flex; align-items:center; justify-content:space-between;
-    flex-shrink:0; gap:8px;
-  }
+  .footer { padding:12px 16px; border-top:0.5px solid var(--border2); display:flex; align-items:center; justify-content:space-between; flex-shrink:0; gap:8px; }
   .footer-note { font-size:10px; color:var(--muted); line-height:1.4; flex:1; }
-  .btn-all {
-    font-size:11px; font-weight:500; border-radius:7px; border:none;
-    cursor:pointer; padding:7px 18px; font-family:inherit;
-    background:var(--comp); color:white; white-space:nowrap;
-    transition:background .15s;
-  }
-  .btn-all:hover { background:var(--comp-d); }
-  .btn-all.has-updates { background:var(--green); }
-  .btn-all.has-updates:hover { background:var(--green-d); }
+
+  /* Coming soon */
+  .coming-soon { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; color:var(--muted); text-align:center; padding:32px; }
+  .coming-soon-icon { font-size:28px; opacity:.25; margin-bottom:4px; }
 
   /* Progress */
   .prog-wrap { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:32px 24px; gap:14px; }
@@ -96,37 +87,50 @@
   <div class="logo"><span></span><span></span><span></span><span></span></div>
   <div>
     <div class="logo-name">Grebbans</div>
-    <div class="logo-sub" id="ver-sub">Handover · v7.0</div>
+    <div class="logo-sub" id="ver-sub">Handover</div>
   </div>
+</div>
+
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('stylesheet')">Style sheet</button>
+  <button class="tab disabled" onclick="">Handover</button>
 </div>
 
 <!-- MAIN -->
 <div class="screen hidden" id="s-main">
-  <div class="list-wrap" id="item-list"></div>
+  <div class="list-wrap">
+    <div class="tab-content active" id="tab-stylesheet" ></div>
+    <div class="tab-content" id="tab-handover">
+      <div class="coming-soon">
+        <div class="coming-soon-icon">◎</div>
+        <div style="font-size:13px;font-weight:500">Handover</div>
+        <div style="font-size:11px">Component and module handover functions coming after Figma write access is available.</div>
+      </div>
+    </div>
+  </div>
   <div class="footer">
-    <div class="footer-note" id="footer-note">Frames are placed inside the ✏️ Style sheet section if it exists.</div>
-    <button class="btn-all" id="btn-all" onclick="buildAll()">Generate all</button>
+    <div class="footer-note" id="footer-note">Style sheet frames are placed on the current page.</div>
   </div>
 </div>
 
 <!-- PROGRESS -->
 <div class="screen hidden" id="s-progress">
   <div class="prog-wrap">
-    <div class="prog-title">Building…</div>
+    <div class="prog-title" id="prog-title">Building...</div>
     <div class="prog-bar-wrap"><div class="prog-bar" id="prog-bar" style="width:10%"></div></div>
-    <div class="prog-sub" id="prog-sub">Starting…</div>
+    <div class="prog-sub" id="prog-sub">Starting...</div>
   </div>
 </div>
 
 <!-- DONE -->
 <div class="screen hidden" id="s-done">
   <div class="done-wrap">
-    <div class="done-icon">✦</div>
+    <div class="done-icon">+</div>
     <div class="done-title" id="done-title">Done!</div>
     <div class="done-sub" id="done-sub">Frames updated on canvas.</div>
     <div class="done-btns">
-      <button class="btn-ghost" onclick="show('s-main')">← Back</button>
-      <button class="btn-all" onclick="parent.postMessage({pluginMessage:{type:'close'}},'*')">Close</button>
+      <button class="btn-ghost" onclick="show('s-main')">Back</button>
+      <button class="btn-gen" onclick="parent.postMessage({pluginMessage:{type:'close'}},'*')">Close</button>
     </div>
   </div>
 </div>
@@ -134,24 +138,24 @@
 <!-- EMPTY -->
 <div class="screen hidden" id="s-empty">
   <div class="empty">
-    <div style="font-size:28px;opacity:.3">⬡</div>
+    <div style="font-size:28px;opacity:.3">◌</div>
     <div style="font-size:13px;font-weight:500">Nothing to generate</div>
-    <div style="font-size:11px">No colour variables or styles found in this file.</div>
+    <div style="font-size:11px">No colour variables, text styles, or grid guides found in this file.</div>
   </div>
 </div>
 
 <script>
 var items = [];
-var collectionMap = {};
-var buildQueue = [];
-var builtCount = 0;
+var activeItem = null;
+
+var SECTION_ICONS = { colours: 'C', typography: 'T', grid: 'G' };
 
 window.onmessage = function(e) {
   var msg = e.data.pluginMessage;
   if (!msg) return;
 
   if (msg.type === 'init') {
-    document.getElementById('ver-sub').textContent = 'Handover · v' + msg.version;
+    document.getElementById('ver-sub').textContent = 'Handover v' + msg.version;
     items = msg.items;
     if (!items.length) { show('s-empty'); return; }
     renderList();
@@ -160,88 +164,65 @@ window.onmessage = function(e) {
 
   if (msg.type === 'progress') {
     document.getElementById('prog-sub').textContent = msg.name;
-    var idx = buildQueue.indexOf(msg.name);
-    var pct = buildQueue.length ? Math.round(((idx + 0.5) / buildQueue.length) * 100) : 50;
-    document.getElementById('prog-bar').style.width = Math.max(pct, 10) + '%';
+    document.getElementById('prog-bar').style.width = '60%';
   }
 
   if (msg.type === 'done') {
-    // Mark built items as "exists"
-    buildQueue.forEach(function(id) {
-      var item = items.find(function(i) { return i.id === id || i.name === id; });
-      if (item) item.exists = true;
-    });
+    if (activeItem) activeItem.exists = true;
     document.getElementById('prog-bar').style.width = '100%';
+    var label = activeItem ? activeItem.name : 'Frames';
     document.getElementById('done-title').textContent = 'Done!';
-    document.getElementById('done-sub').textContent = buildQueue.length + ' frame' + (buildQueue.length !== 1 ? 's' : '') + ' built on canvas.';
-    setTimeout(function() { show('s-done'); }, 300);
+    document.getElementById('done-sub').textContent = label + ' generated on canvas.';
+    setTimeout(function() {
+      renderList();
+      show('s-done');
+    }, 300);
   }
 
   if (msg.type === 'error') {
     show('s-main');
-    document.getElementById('footer-note').textContent = '✗ ' + msg.message;
+    document.getElementById('footer-note').textContent = 'Error: ' + msg.message;
   }
 };
 
 function renderList() {
-  var list = document.getElementById('item-list');
-  list.innerHTML = '';
-  var hasAny = false, hasUpdates = false;
+  var stylesheetEl = document.getElementById('tab-stylesheet');
+  stylesheetEl.innerHTML = '';
 
-  items.forEach(function(item) {
-    hasAny = true;
-    if (item.exists) hasUpdates = true;
+  var stylesheetItems = items.filter(function(i) { return i.tab === 'stylesheet'; });
 
+  if (!stylesheetItems.length) {
+    stylesheetEl.innerHTML = '<div class="empty"><div style="font-size:11px">No style sheet items found.</div></div>';
+    return;
+  }
+
+  stylesheetItems.forEach(function(item) {
     var card = document.createElement('div');
     card.className = 'section-card';
+    var btnLabel = item.exists ? 'Update' : 'Generate';
+    var btnClass = 'btn-gen' + (item.exists ? ' update' : '');
     card.innerHTML = '<div class="section-info">'
       + '<div class="section-name">' + esc(item.name) + '</div>'
       + '<div class="section-meta">' + esc(item.meta) + '</div>'
       + '</div>'
-      + '<button class="btn-gen' + (item.exists ? ' update' : '') + '" data-id="' + esc(item.id) + '">'
-      + (item.exists ? 'Update' : 'Generate')
-      + '</button>';
-
-    card.querySelector('.btn-gen').onclick = function() {
-      buildTargets([item.id]);
-    };
-    list.appendChild(card);
+      + '<button class="' + btnClass + '" data-id="' + esc(item.id) + '">' + btnLabel + '</button>';
+    card.querySelector('button').onclick = function() { buildItem(item); };
+    stylesheetEl.appendChild(card);
   });
-
-  var btnAll = document.getElementById('btn-all');
-  var allExist = items.length > 0 && items.every(function(i) { return i.exists; });
-  if (hasUpdates && allExist) {
-    btnAll.textContent = 'Update all';
-    btnAll.classList.add('has-updates');
-  } else if (hasUpdates) {
-    btnAll.textContent = 'Generate & update all';
-    btnAll.classList.add('has-updates');
-  } else {
-    btnAll.textContent = 'Generate all';
-    btnAll.classList.remove('has-updates');
-  }
 }
 
-function buildAll() {
-  buildTargets(items.map(function(i) { return i.id; }));
-}
-
-function buildTargets(ids) {
-  buildQueue = ids;
-  builtCount = 0;
+function buildItem(item) {
+  activeItem = item;
+  document.getElementById('prog-title').textContent = (item.exists ? 'Updating ' : 'Generating ') + item.name + '...';
+  document.getElementById('prog-sub').textContent = 'Starting...';
   document.getElementById('prog-bar').style.width = '10%';
-  document.getElementById('prog-sub').textContent = 'Starting…';
   show('s-progress');
+  parent.postMessage({ pluginMessage: { type: 'build', id: item.id } }, '*');
+}
 
-  // Build collection map
-  var cm = {};
-  items.forEach(function(i) { cm[i.id] = i; });
-
-  parent.postMessage({ pluginMessage: {
-    type: 'build',
-    targets: ids,
-    collectionMap: cm
-  }}, '*');
+function switchTab(tab) {
+  document.querySelectorAll('.tab-content').forEach(function(el) { el.classList.remove('active'); });
+  document.getElementById('tab-' + tab).classList.add('active');
 }
 
 function show(id) {
