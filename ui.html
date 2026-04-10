@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Grebbans Handover</title>
+<title>Figma Handover</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -86,14 +86,15 @@
 <div class="hdr">
   <div class="logo"><span></span><span></span><span></span><span></span></div>
   <div>
-    <div class="logo-name">Grebbans</div>
-    <div class="logo-sub" id="ver-sub">Handover</div>
+    <div class="logo-name">Figma Handover</div>
+    <div class="logo-sub" id="ver-sub">v9.3</div>
   </div>
 </div>
 
 <div class="tabs">
   <button class="tab active" onclick="switchTab('stylesheet')">Style sheet</button>
   <button class="tab disabled" onclick="">Handover</button>
+  <button class="tab disabled" onclick="">Add</button>
 </div>
 
 <!-- MAIN -->
@@ -155,7 +156,7 @@ window.onmessage = function(e) {
   if (!msg) return;
 
   if (msg.type === 'init') {
-    document.getElementById('ver-sub').textContent = 'Handover v' + msg.version;
+    document.getElementById('ver-sub').textContent = 'v' + msg.version;
     items = msg.items;
     if (!items.length) { show('s-empty'); return; }
     renderList();
