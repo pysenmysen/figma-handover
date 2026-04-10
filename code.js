@@ -17,7 +17,7 @@ var KEYS = {
   slotsGrid:       'b0abdcf55797a8770b650c170c96a0e3e32e6f72',
 };
 
-figma.showUI(__html__, { width: 480, height: 640, themeColors: true });
+figma.showUI(__html__, { width: 380, height: 480, themeColors: true });
 
 // ============================================================
 // INIT
