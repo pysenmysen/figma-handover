@@ -21,10 +21,7 @@ async function buildTypography() {
   });
 
   var outer = getOrCreateFrame('Doc/Typography');
-  outer.fills = []; outer.clipsContent = false;
-  outer.layoutMode = 'VERTICAL'; outer.itemSpacing = 16;
-  outer.counterAxisSizingMode = 'FIXED'; outer.primaryAxisSizingMode = 'AUTO';
-  outer.resize(FRAME_W, outer.height || 100);
+  configDocRows(outer, FRAME_W);
 
   var purposes = {
     Primary:   'Used for headings and display text.',
@@ -42,12 +39,7 @@ async function buildTypography() {
     var variantType = gKeyL === 'secondary' ? 'Secondary' : (gKeyL === 'misc' || gKeyL === 'miscellaneous') ? 'Misc' : 'Primary';
 
     // Group row
-    var secRow = figma.createFrame();
-    secRow.name = gKey; secRow.fills = [];
-    secRow.layoutMode = 'HORIZONTAL'; secRow.itemSpacing = 16;
-    secRow.primaryAxisSizingMode = 'FIXED'; secRow.counterAxisSizingMode = 'AUTO';
-    secRow.layoutAlign = 'STRETCH';
-    outer.appendChild(secRow);
+    var secRow = createDocRow(outer, gKey);
 
     // Collect font info for Slots/Typography
     var fontFamily = g.styles[0].fontName ? g.styles[0].fontName.family : '-';
@@ -107,17 +99,12 @@ async function buildTypography() {
     var isMisc = variantType === 'Misc';
     var colW = CONTENT_W;
     var stylesCol = figma.createFrame();
-    stylesCol.name = 'TextStyles'; stylesCol.fills = [];
+    stylesCol.name = isMisc ? 'DocWrap' : 'DocRows';
     stylesCol.layoutGrow = 1; stylesCol.layoutAlign = 'INHERIT';
     if (isMisc) {
-      stylesCol.layoutMode = 'HORIZONTAL'; stylesCol.layoutWrap = 'WRAP';
-      stylesCol.itemSpacing = 4; stylesCol.counterAxisSpacing = 4;
-      stylesCol.primaryAxisSizingMode = 'FIXED'; stylesCol.counterAxisSizingMode = 'AUTO';
-      stylesCol.resize(colW, 100);
+      configDocWrap(stylesCol, colW);
     } else {
-      stylesCol.layoutMode = 'VERTICAL'; stylesCol.itemSpacing = 4;
-      stylesCol.primaryAxisSizingMode = 'AUTO'; stylesCol.counterAxisSizingMode = 'FIXED';
-      stylesCol.resize(colW, 100);
+      configDocRows(stylesCol, colW);
     }
     secRow.appendChild(stylesCol);
 

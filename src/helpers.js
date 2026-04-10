@@ -60,6 +60,57 @@ function clearChildren(frame) {
 function placeFrame(frame) {
   figma.viewport.scrollAndZoomIntoView([frame]);
 }
+// ---- Layout configure helpers ----
+// Always call these on both new AND existing frames - fixes sizing on update.
+// Modes set BEFORE resize so AUTO takes effect correctly.
+
+// VERTICAL, fixed width, hug height
+function configDocRows(frame, width) {
+  frame.fills = []; frame.clipsContent = false;
+  frame.layoutMode = 'VERTICAL'; frame.itemSpacing = 16;
+  frame.layoutAlign = 'STRETCH';
+  frame.counterAxisSizingMode = 'FIXED';  // width fixed
+  frame.primaryAxisSizingMode = 'AUTO';   // height hugs
+  frame.resize(width || CONTENT_W, 1);    // set fixed width; height auto
+}
+
+// HORIZONTAL, fixed width, hug height
+function configDocCol(frame, width) {
+  frame.fills = []; frame.clipsContent = false;
+  frame.layoutMode = 'HORIZONTAL'; frame.itemSpacing = 20;
+  frame.layoutAlign = 'STRETCH';
+  frame.primaryAxisSizingMode = 'FIXED';  // width fixed
+  frame.counterAxisSizingMode = 'AUTO';   // height hugs
+  frame.resize(width || FRAME_W, 1);      // set fixed width; height auto
+}
+
+// HORIZONTAL + WRAP, fixed width, hug height
+function configDocWrap(frame, width) {
+  frame.fills = []; frame.clipsContent = false;
+  frame.layoutMode = 'HORIZONTAL'; frame.layoutWrap = 'WRAP';
+  frame.itemSpacing = 4; frame.counterAxisSpacing = 4;
+  frame.layoutAlign = 'STRETCH';
+  frame.primaryAxisSizingMode = 'FIXED';  // width fixed (required for wrap)
+  frame.counterAxisSizingMode = 'AUTO';   // height hugs
+  frame.resize(width || CONTENT_W, 1);    // set fixed width; height auto
+}
+
+
+// Creates a standard "Doc row" frame - Doc/Default panel (320px) + content side by side
+// Used identically across Colours, Typography and Grid outputs
+function createDocRow(parent, name) {
+  var row = figma.createFrame();
+  row.name = name;
+  row.fills = [];
+  row.layoutMode = 'HORIZONTAL';
+  row.itemSpacing = 20;         // gap between Doc/Default and content
+  row.primaryAxisSizingMode = 'FIXED';
+  row.counterAxisSizingMode = 'AUTO'; // hug height
+  row.layoutAlign = 'STRETCH';       // fill parent width
+  row.resize(FRAME_W, 100);
+  parent.appendChild(row);
+  return row;
+}
 
 // Sets horizontal auto-layout with fixed width + hug height (most common outer frame pattern)
 function setupOuterFrame(frame, isNew) {

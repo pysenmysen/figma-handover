@@ -51,10 +51,7 @@ async function buildGrid() {
   var otherComp    = await figma.importComponentByKeyAsync(KEYS.sectionOther);
 
   var outer = getOrCreateFrame('Doc/Grid');
-  outer.fills = []; outer.clipsContent = false;
-  outer.layoutMode = 'VERTICAL'; outer.itemSpacing = 16;
-  outer.counterAxisSizingMode = 'FIXED'; outer.primaryAxisSizingMode = 'AUTO';
-  outer.resize(FRAME_W, outer.height || 100);
+  configDocRows(outer, FRAME_W);
 
   for (var i = 0; i < colStyles.length; i++) {
     var gs = colStyles[i];
@@ -81,13 +78,7 @@ async function buildGridBreakpoint(outer, colGrid, label, docComp, gridSlotComp,
   if (isFill) vizW = CONTENT_W;
 
   // Row frame
-  var rowFrame = figma.createFrame();
-  rowFrame.name = label + 'Grid';
-  rowFrame.fills = [];
-  rowFrame.layoutMode = 'HORIZONTAL'; rowFrame.itemSpacing = 16;
-  rowFrame.primaryAxisSizingMode = 'FIXED'; rowFrame.counterAxisSizingMode = 'AUTO';
-  rowFrame.layoutAlign = 'STRETCH';
-  outer.appendChild(rowFrame);
+  var rowFrame = createDocRow(outer, label + 'Grid');
 
   // Doc panel
   var docInst = docComp.createInstance();
