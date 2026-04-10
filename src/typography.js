@@ -105,7 +105,7 @@ async function buildTypography() {
 
     // Styles column
     var isMisc = variantType === 'Misc';
-    var colW = FRAME_W - 320 - 16;
+    var colW = CONTENT_W;
     var stylesCol = figma.createFrame();
     stylesCol.name = 'TextStyles'; stylesCol.fills = [];
     stylesCol.layoutGrow = 1; stylesCol.layoutAlign = 'INHERIT';

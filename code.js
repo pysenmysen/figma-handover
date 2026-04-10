@@ -7,7 +7,8 @@
 // Edit VERSION, FRAME_W and KEYS here. All other files read from this.
 
 var VERSION = '10.0';
-var FRAME_W  = 1504;
+var FRAME_W    = 1504;
+var CONTENT_W  = FRAME_W - 320 - 20; // width of content area next to Doc/Default (1164px)
 
 var KEYS = {
   docModule:       '8df1ea68f02f91062978acb1ccbab2cec2e92171', // Doc/Default State=Default
@@ -94,9 +95,10 @@ function setupOuterFrame(frame, isNew) {
   frame.fills = []; frame.clipsContent = false;
   frame.layoutMode = 'HORIZONTAL'; frame.itemSpacing = 20;
   frame.layoutAlign = 'STRETCH';
+  // Set sizing modes before resize so AUTO height is respected
   frame.primaryAxisSizingMode = 'FIXED';
   frame.counterAxisSizingMode = 'AUTO';
-  if (isNew) frame.resize(FRAME_W, 100);
+  if (isNew) frame.resize(FRAME_W, 100); // only set dimensions on first creation
 }
 
 // --- Colour helpers ---
@@ -264,7 +266,7 @@ async function buildPrimitivesFrame(col, wrapper) {
   primContent.fills = []; primContent.clipsContent = false;
   primContent.layoutMode = 'VERTICAL'; primContent.itemSpacing = 16;
   primContent.counterAxisSizingMode = 'FIXED'; primContent.primaryAxisSizingMode = 'AUTO';
-  if (!primContent.width || primContent.width < 100) primContent.resize(FRAME_W - 320 - 20, 100);
+  primContent.resize(CONTENT_W, 100);
 
   var modeId = col.defaultModeId;
   var groups = {}, groupOrder = [];
@@ -413,7 +415,7 @@ async function buildGradientsFrame(wrapper) {
   content.layoutMode = 'HORIZONTAL'; content.layoutWrap = 'WRAP';
   content.itemSpacing = 4; content.counterAxisSpacing = 4;
   content.counterAxisSizingMode = 'AUTO'; content.primaryAxisSizingMode = 'FIXED';
-  if (!content.width || content.width < 100) content.resize(FRAME_W - 320 - 20, 100);
+  content.resize(CONTENT_W, 100);
 
   for (var gi = 0; gi < gradients.length; gi++) {
     var grad = gradients[gi];
@@ -495,12 +497,11 @@ async function buildEffectsFrame(wrapper) {
   var cr = getOrCreateSubFrame(outer, 'EffectStyles');
   var content = cr.frame;
   clearChildren(content);
-  var effW = FRAME_W - 320 - 20;
-  content.fills = []; content.clipsContent = false;
+    content.fills = []; content.clipsContent = false;
   content.layoutMode = 'HORIZONTAL'; content.layoutWrap = 'WRAP';
   content.itemSpacing = 4; content.counterAxisSpacing = 4;
   content.primaryAxisSizingMode = 'FIXED'; content.counterAxisSizingMode = 'AUTO';
-  if (!content.width || content.width < 100) content.resize(effW, 100);
+  content.resize(CONTENT_W, 100);
 
   for (var ei = 0; ei < effects.length; ei++) {
     var eff = effects[ei];
@@ -660,7 +661,7 @@ async function buildTypography() {
 
     // Styles column
     var isMisc = variantType === 'Misc';
-    var colW = FRAME_W - 320 - 16;
+    var colW = CONTENT_W;
     var stylesCol = figma.createFrame();
     stylesCol.name = 'TextStyles'; stylesCol.fills = [];
     stylesCol.layoutGrow = 1; stylesCol.layoutAlign = 'INHERIT';
@@ -799,7 +800,7 @@ async function buildGridBreakpoint(outer, colGrid, label, docComp, gridSlotComp,
 
   var vizW = GRID_BP_WIDTHS[label];
   var isFill = vizW === null;
-  if (isFill) vizW = FRAME_W - 320 - 16;
+  if (isFill) vizW = CONTENT_W;
 
   // Row frame
   var rowFrame = figma.createFrame();

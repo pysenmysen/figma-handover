@@ -2,7 +2,8 @@
 // Edit VERSION, FRAME_W and KEYS here. All other files read from this.
 
 var VERSION = '10.0';
-var FRAME_W  = 1504;
+var FRAME_W    = 1504;
+var CONTENT_W  = FRAME_W - 320 - 20; // width of content area next to Doc/Default (1164px)
 
 var KEYS = {
   docModule:       '8df1ea68f02f91062978acb1ccbab2cec2e92171', // Doc/Default State=Default

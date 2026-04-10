@@ -50,7 +50,7 @@ async function buildPrimitivesFrame(col, wrapper) {
   primContent.fills = []; primContent.clipsContent = false;
   primContent.layoutMode = 'VERTICAL'; primContent.itemSpacing = 16;
   primContent.counterAxisSizingMode = 'FIXED'; primContent.primaryAxisSizingMode = 'AUTO';
-  if (!primContent.width || primContent.width < 100) primContent.resize(FRAME_W - 320 - 20, 100);
+  primContent.resize(CONTENT_W, 100);
 
   var modeId = col.defaultModeId;
   var groups = {}, groupOrder = [];
@@ -199,7 +199,7 @@ async function buildGradientsFrame(wrapper) {
   content.layoutMode = 'HORIZONTAL'; content.layoutWrap = 'WRAP';
   content.itemSpacing = 4; content.counterAxisSpacing = 4;
   content.counterAxisSizingMode = 'AUTO'; content.primaryAxisSizingMode = 'FIXED';
-  if (!content.width || content.width < 100) content.resize(FRAME_W - 320 - 20, 100);
+  content.resize(CONTENT_W, 100);
 
   for (var gi = 0; gi < gradients.length; gi++) {
     var grad = gradients[gi];
@@ -281,12 +281,11 @@ async function buildEffectsFrame(wrapper) {
   var cr = getOrCreateSubFrame(outer, 'EffectStyles');
   var content = cr.frame;
   clearChildren(content);
-  var effW = FRAME_W - 320 - 20;
-  content.fills = []; content.clipsContent = false;
+    content.fills = []; content.clipsContent = false;
   content.layoutMode = 'HORIZONTAL'; content.layoutWrap = 'WRAP';
   content.itemSpacing = 4; content.counterAxisSpacing = 4;
   content.primaryAxisSizingMode = 'FIXED'; content.counterAxisSizingMode = 'AUTO';
-  if (!content.width || content.width < 100) content.resize(effW, 100);
+  content.resize(CONTENT_W, 100);
 
   for (var ei = 0; ei < effects.length; ei++) {
     var eff = effects[ei];

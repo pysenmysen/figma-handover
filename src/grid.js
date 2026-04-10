@@ -78,7 +78,7 @@ async function buildGridBreakpoint(outer, colGrid, label, docComp, gridSlotComp,
 
   var vizW = GRID_BP_WIDTHS[label];
   var isFill = vizW === null;
-  if (isFill) vizW = FRAME_W - 320 - 16;
+  if (isFill) vizW = CONTENT_W;
 
   // Row frame
   var rowFrame = figma.createFrame();

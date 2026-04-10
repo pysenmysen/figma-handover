@@ -66,9 +66,10 @@ function setupOuterFrame(frame, isNew) {
   frame.fills = []; frame.clipsContent = false;
   frame.layoutMode = 'HORIZONTAL'; frame.itemSpacing = 20;
   frame.layoutAlign = 'STRETCH';
+  // Set sizing modes before resize so AUTO height is respected
   frame.primaryAxisSizingMode = 'FIXED';
   frame.counterAxisSizingMode = 'AUTO';
-  if (isNew) frame.resize(FRAME_W, 100);
+  if (isNew) frame.resize(FRAME_W, 100); // only set dimensions on first creation
 }
 
 // --- Colour helpers ---
