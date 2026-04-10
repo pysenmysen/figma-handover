@@ -1,6 +1,6 @@
 // Grebbans Handover - v9.0
 
-var VERSION = '9.4';
+var VERSION = '9.5';
 var FRAME_W = 1504;
 var GRID_W  = 1616; // 320 doc + 16 gap + 1280 desk grid
 
@@ -43,9 +43,7 @@ figma.showUI(__html__, { width: 380, height: 480, themeColors: true });
     var metaParts = colourCols.map(function(c) { return c.name; });
     if (gradCount > 0) metaParts.push('Gradients');
     if (effectStyles.length > 0) metaParts.push('Effects');
-    var anyColourExists = colourCols.some(function(col) {
-      return !!findExistingFrame('Doc/' + col.name);
-    }) || !!findExistingFrame('Doc/Gradients') || !!findExistingFrame('Doc/Effects');
+    var anyColourExists = !!findExistingFrame('Doc/Colour');
     items.push({
       id: 'colours', name: 'Colours', tab: 'stylesheet',
       meta: metaParts.join(' - '), exists: anyColourExists
@@ -237,6 +235,18 @@ function findCssVariable(cssName) {
 // COLOURS MODULE
 // ============================================================
 async function buildColoursAll() {
+  // Single Doc/Colour wrapper frame
+  var wrapper = findExistingFrame('Doc/Colour');
+  if (!wrapper) {
+    wrapper = figma.createFrame();
+    wrapper.name = 'Doc/Colour';
+    figma.currentPage.appendChild(wrapper);
+  }
+  wrapper.fills = []; wrapper.clipsContent = false;
+  wrapper.layoutMode = 'VERTICAL'; wrapper.itemSpacing = 16;
+  wrapper.primaryAxisSizingMode = 'AUTO'; wrapper.counterAxisSizingMode = 'FIXED';
+  wrapper.resize(FRAME_W, wrapper.height || 100);
+
   var collections = figma.variables.getLocalVariableCollections();
   for (var i = 0; i < collections.length; i++) {
     var col = collections[i];
@@ -246,8 +256,8 @@ async function buildColoursAll() {
     });
     if (!hasColor) continue;
     figma.ui.postMessage({ type: 'progress', name: col.name });
-    if (isSemantic(col)) await buildThemesFrame(col);
-    else await buildPrimitivesFrame(col);
+    if (isSemantic(col)) await buildThemesFrame(col, wrapper);
+    else await buildPrimitivesFrame(col, wrapper);
   }
   var paintStyles = figma.getLocalPaintStyles();
   var gradients = paintStyles.filter(function(s) {
@@ -255,25 +265,30 @@ async function buildColoursAll() {
   });
   if (gradients.length > 0) {
     figma.ui.postMessage({ type: 'progress', name: 'Gradients' });
-    await buildGradientsFrame();
+    await buildGradientsFrame(wrapper);
   }
   var effectStyles = figma.getLocalEffectStyles();
   if (effectStyles.length > 0) {
     figma.ui.postMessage({ type: 'progress', name: 'Effects' });
-    await buildEffectsFrame();
+    await buildEffectsFrame(wrapper);
   }
+  placeFrame(wrapper);
 }
 
-async function buildPrimitivesFrame(col) {
-  var OUTER_NAME = 'Doc/' + col.name;
+async function buildPrimitivesFrame(col, wrapper) {
   var colComp = await figma.importComponentByKeyAsync(KEYS.colourPrimitive);
 
-  var outer = findExistingFrame(OUTER_NAME);
+  // Find or create sub-frame inside wrapper
+  var outer = null;
+  for (var wi = 0; wi < wrapper.children.length; wi++) {
+    if (wrapper.children[wi].type === 'FRAME' && wrapper.children[wi].name === col.name) { outer = wrapper.children[wi]; break; }
+  }
   var isNew = !outer;
-  if (isNew) { outer = figma.createFrame(); outer.name = OUTER_NAME; figma.currentPage.appendChild(outer); }
+  if (isNew) { outer = figma.createFrame(); outer.name = col.name; wrapper.appendChild(outer); }
   outer.fills = []; outer.clipsContent = false;
   outer.layoutMode = 'HORIZONTAL'; outer.itemSpacing = 20;
-  if (isNew) { outer.primaryAxisSizingMode = 'FIXED'; outer.counterAxisSizingMode = 'AUTO'; outer.resize(FRAME_W, 100); }
+  outer.layoutAlign = 'STRETCH'; outer.primaryAxisSizingMode = 'FIXED'; outer.counterAxisSizingMode = 'AUTO';
+  if (isNew) outer.resize(FRAME_W, 100);
 
   // Always ensure doc panel exists (handles both new + update, and silent import failures)
   var existingDocPrim = outer.findOne(function(n) { return n.type === 'INSTANCE' && n.componentId !== undefined && n.componentId !== null; });
@@ -367,20 +382,22 @@ async function buildPrimitivesFrame(col) {
       } catch(e) {}
     }
   }
-  placeFrame(outer);
 }
 
-async function buildThemesFrame(col) {
-  var OUTER_NAME = 'Doc/' + col.name;
+async function buildThemesFrame(col, wrapper) {
   var colComp    = await figma.importComponentByKeyAsync(KEYS.themesCol);
   var colourComp = await figma.importComponentByKeyAsync(KEYS.themesColour);
 
-  var outer = findExistingFrame(OUTER_NAME);
+  var outer = null;
+  for (var wi = 0; wi < wrapper.children.length; wi++) {
+    if (wrapper.children[wi].type === 'FRAME' && wrapper.children[wi].name === col.name) { outer = wrapper.children[wi]; break; }
+  }
   var isNew = !outer;
-  if (isNew) { outer = figma.createFrame(); outer.name = OUTER_NAME; figma.currentPage.appendChild(outer); }
+  if (isNew) { outer = figma.createFrame(); outer.name = col.name; wrapper.appendChild(outer); }
   outer.fills = []; outer.clipsContent = false;
   outer.layoutMode = 'HORIZONTAL'; outer.itemSpacing = 20;
-  if (isNew) { outer.primaryAxisSizingMode = 'FIXED'; outer.counterAxisSizingMode = 'AUTO'; outer.resize(FRAME_W, 100); }
+  outer.layoutAlign = 'STRETCH'; outer.primaryAxisSizingMode = 'FIXED'; outer.counterAxisSizingMode = 'AUTO';
+  if (isNew) outer.resize(FRAME_W, 100);
 
   var existingDocTheme = outer.findOne(function(n) { return n.type === 'INSTANCE' && n.componentId !== undefined && n.componentId !== null; });
   if (!existingDocTheme) {
@@ -459,7 +476,6 @@ async function buildThemesFrame(col) {
       } catch(e) {}
     }
   }
-  placeFrame(outer);
 }
 
 function effectToCss(effects) {
@@ -484,8 +500,7 @@ function effectToCss(effects) {
   return parts.join(', ');
 }
 
-async function buildGradientsFrame() {
-  var OUTER_NAME = 'Doc/Gradients';
+async function buildGradientsFrame(wrapper) {
   var paintStyles = figma.getLocalPaintStyles();
   var gradients = [];
   paintStyles.forEach(function(ps) {
@@ -496,11 +511,16 @@ async function buildGradientsFrame() {
   });
   if (!gradients.length) return;
   var gradComp = await figma.importComponentByKeyAsync(KEYS.gradientCard);
-  var outer = findExistingFrame(OUTER_NAME);
+  var outer = null;
+  for (var wi = 0; wi < wrapper.children.length; wi++) {
+    if (wrapper.children[wi].type === 'FRAME' && wrapper.children[wi].name === 'Gradients') { outer = wrapper.children[wi]; break; }
+  }
   var isNew = !outer;
-  if (isNew) { outer = figma.createFrame(); outer.name = OUTER_NAME; figma.currentPage.appendChild(outer); }
+  if (isNew) { outer = figma.createFrame(); outer.name = 'Gradients'; wrapper.appendChild(outer); }
   outer.fills = []; outer.clipsContent = false;
   outer.layoutMode = 'HORIZONTAL'; outer.itemSpacing = 20;
+  outer.layoutAlign = 'STRETCH'; outer.primaryAxisSizingMode = 'FIXED'; outer.counterAxisSizingMode = 'AUTO';
+  if (isNew) outer.resize(FRAME_W, 100);
   if (isNew) { outer.primaryAxisSizingMode = 'FIXED'; outer.counterAxisSizingMode = 'AUTO'; outer.resize(FRAME_W, 100); }
   var existingDocGrad = outer.findOne(function(n) { return n.type === 'INSTANCE' && n.componentId !== undefined && n.componentId !== null; });
   if (!existingDocGrad) {
@@ -556,11 +576,9 @@ async function buildGradientsFrame() {
       }
     } catch(e) {}
   }
-  placeFrame(outer);
 }
 
-async function buildEffectsFrame() {
-  var OUTER_NAME = 'Doc/Effects';
+async function buildEffectsFrame(wrapper) {
   var effectStyles = figma.getLocalEffectStyles();
   var effects = [];
   effectStyles.forEach(function(es) {
@@ -570,12 +588,16 @@ async function buildEffectsFrame() {
   });
   if (!effects.length) return;
   var effectComp = await figma.importComponentByKeyAsync(KEYS.effectCard);
-  var outer = findExistingFrame(OUTER_NAME);
+  var outer = null;
+  for (var wi = 0; wi < wrapper.children.length; wi++) {
+    if (wrapper.children[wi].type === 'FRAME' && wrapper.children[wi].name === 'Effects') { outer = wrapper.children[wi]; break; }
+  }
   var isNew = !outer;
-  if (isNew) { outer = figma.createFrame(); outer.name = OUTER_NAME; figma.currentPage.appendChild(outer); }
+  if (isNew) { outer = figma.createFrame(); outer.name = 'Effects'; wrapper.appendChild(outer); }
   outer.fills = []; outer.clipsContent = false;
   outer.layoutMode = 'HORIZONTAL'; outer.itemSpacing = 20;
-  if (isNew) { outer.primaryAxisSizingMode = 'FIXED'; outer.counterAxisSizingMode = 'AUTO'; outer.resize(FRAME_W, 100); }
+  outer.layoutAlign = 'STRETCH'; outer.primaryAxisSizingMode = 'FIXED'; outer.counterAxisSizingMode = 'AUTO';
+  if (isNew) outer.resize(FRAME_W, 100);
   var existingDocEff = outer.findOne(function(n) { return n.type === 'INSTANCE' && n.componentId !== undefined && n.componentId !== null; });
   if (!existingDocEff) {
     try {
@@ -646,7 +668,6 @@ async function buildEffectsFrame() {
       }
     } catch(e) {}
   }
-  placeFrame(outer);
 }
 
 // ============================================================
