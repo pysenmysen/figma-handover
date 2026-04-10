@@ -1,6 +1,6 @@
 // Grebbans Handover - v9.0
 
-var VERSION = '9.0';
+var VERSION = '9.2';
 var FRAME_W = 1504;
 var GRID_W  = 1616; // 320 doc + 16 gap + 1280 desk grid
 
@@ -79,26 +79,16 @@ figma.showUI(__html__, { width: 480, height: 640, themeColors: true });
 })();
 
 function detectGridBreakpoints() {
-  var bps = [], seen = {};
-  function scan(nodes) {
-    for (var i = 0; i < nodes.length; i++) {
-      var n = nodes[i];
-      if (n.type === 'FRAME' && n.layoutGrids && n.layoutGrids.length > 0) {
-        for (var gi = 0; gi < n.layoutGrids.length; gi++) {
-          if (n.layoutGrids[gi].pattern === 'COLUMNS') {
-            var w = Math.round(n.width);
-            if (!seen[w]) {
-              seen[w] = true;
-              bps.push(w <= 767 ? 'Mob' : w <= 1279 ? 'Tab' : w <= 1535 ? 'Desk' : 'Cinema');
-            }
-            break;
-          }
-        }
-      }
-      if (n.children && n.type !== 'COMPONENT' && n.type !== 'INSTANCE') scan(n.children);
-    }
-  }
-  scan(figma.currentPage.children);
+  var bps = [];
+  var gridStyles = figma.getLocalGridStyles();
+  gridStyles.forEach(function(gs) {
+    if (!gs.layoutGrids || !gs.layoutGrids.some(function(g) { return g.pattern === 'COLUMNS'; })) return;
+    var n = gs.name.toLowerCase();
+    if (n.indexOf('mob') !== -1) bps.push('Mob');
+    else if (n.indexOf('tab') !== -1) bps.push('Tab');
+    else if (n.indexOf('desk') !== -1) bps.push('Desk');
+    else bps.push('Wide');
+  });
   return bps;
 }
 
@@ -836,24 +826,21 @@ async function buildGridAll() {
 }
 
 async function buildGrid() {
-  var gridData = [], seenW = {};
-  function scanForColumns(nodes) {
-    for (var i = 0; i < nodes.length; i++) {
-      var n = nodes[i];
-      if (n.type === 'FRAME' && n.layoutGrids && n.layoutGrids.length > 0) {
-        for (var gi = 0; gi < n.layoutGrids.length; gi++) {
-          if (n.layoutGrids[gi].pattern === 'COLUMNS') {
-            var w = Math.round(n.width);
-            if (!seenW[w]) { seenW[w] = true; gridData.push({ width: w, grid: n.layoutGrids[gi] }); }
-            break;
-          }
-        }
-      }
-      if (n.children && n.type !== 'COMPONENT' && n.type !== 'INSTANCE') scanForColumns(n.children);
-    }
-  }
-  scanForColumns(figma.currentPage.children);
-  if (!gridData.length) { figma.ui.postMessage({ type: 'error', message: 'No frames with column grid guides found on this page.' }); return; }
+  // Use local grid styles (the named layout guide styles) as the source of truth
+  var gridStyles = figma.getLocalGridStyles();
+  var colStyles = gridStyles.filter(function(gs) {
+    return gs.layoutGrids && gs.layoutGrids.some(function(g) { return g.pattern === 'COLUMNS'; });
+  });
+  if (!colStyles.length) { figma.ui.postMessage({ type: 'error', message: 'No grid styles found in this file.' }); return; }
+
+  // Sort: Mob, Tab, Desk, Wide
+  var order = { mob: 1, tab: 2, desk: 3, wide: 4, cinema: 4 };
+  colStyles.sort(function(a, b) {
+    var an = a.name.toLowerCase(), bn = b.name.toLowerCase();
+    var aw = 99, bw = 99;
+    Object.keys(order).forEach(function(k) { if (an.indexOf(k) !== -1) aw = order[k]; if (bn.indexOf(k) !== -1) bw = order[k]; });
+    return aw - bw;
+  });
 
   var docComp      = await figma.importComponentByKeyAsync(KEYS.docModule);
   var gridSlotComp = await figma.importComponentByKeyAsync(KEYS.slotsGrid);
@@ -865,46 +852,49 @@ async function buildGrid() {
   outer.counterAxisSizingMode = 'FIXED'; outer.primaryAxisSizingMode = 'AUTO';
   outer.resize(GRID_W, outer.height || 100);
 
-  for (var i = 0; i < gridData.length; i++) {
-    var data = gridData[i];
-    var label = data.width <= 767 ? 'Mob' : data.width <= 1279 ? 'Tab' : data.width <= 1535 ? 'Desk' : 'Cinema';
+  for (var i = 0; i < colStyles.length; i++) {
+    var gs = colStyles[i];
+    var colGrid = null;
+    for (var gi = 0; gi < gs.layoutGrids.length; gi++) {
+      if (gs.layoutGrids[gi].pattern === 'COLUMNS') { colGrid = gs.layoutGrids[gi]; break; }
+    }
+    if (!colGrid) continue;
+
+    // Derive label and display width from style name
+    var sn = gs.name.toLowerCase();
+    var label = sn.indexOf('mob') !== -1 ? 'Mob' : sn.indexOf('tab') !== -1 ? 'Tab' : sn.indexOf('desk') !== -1 ? 'Desk' : 'Wide';
     figma.ui.postMessage({ type: 'progress', name: 'Grid / ' + label });
-    await buildGridBreakpoint(outer, data, label, docComp, gridSlotComp, otherComp);
+    await buildGridBreakpoint(outer, colGrid, label, docComp, gridSlotComp, otherComp);
   }
   placeFrame(outer);
 }
 
-async function buildGridBreakpoint(outer, data, label, docComp, gridSlotComp, otherComp) {
-  var g = data.grid;
-  var columns  = g.count;
-  var gutter   = Math.round(g.gutterSize);
-  var margin   = Math.round(g.offset);
+async function buildGridBreakpoint(outer, colGrid, label, docComp, gridSlotComp, otherComp) {
+  var columns  = colGrid.count;
+  var gutter   = Math.round(colGrid.gutterSize);
+  var margin   = Math.round(colGrid.offset);
 
-  // Fixed display widths per breakpoint
-  var vizWidths = { Mob: 360, Tab: 768, Desk: 1280, Cinema: GRID_W - 320 - 16 };
+  // Fixed display widths per breakpoint (Cinema fills remaining space)
+  var vizWidths = { Mob: 360, Tab: 768, Desk: 1280, Wide: GRID_W - 320 - 16 };
   var vizW = vizWidths[label] || 360;
-  var isCinema = label === 'Cinema';
 
-  // Column width from actual grid data
-  var colWidth = (vizW - 2 * margin - (columns - 1) * gutter) / columns;
-
-  var bpLabels = { Mob: 'Mob (360-768px)', Tab: 'Tab (768-1280px)', Desk: 'Desk (1280-1536px)', Cinema: 'Cinema (1536px+)' };
-  var bpRanges = { Mob: '0 - 767', Tab: '768 - 1279', Desk: '1280 - 1535', Cinema: '1536+' };
-  var purposes = {
-    Mob:    'Grid for mobile devices. All units should have the same column count.' +
-            '\n\nFor mobile, the design should be scalable to at least 320px for accessibility reasons.' +
-            ' Hand over all designs at the same frame size: 360x660px or 390x720px.' +
-            '\n\nThis excludes browser and OS UI from the viewport.',
-    Tab:    'Grid for tablet viewports.' +
-            '\n\nTablet is produced when the project has time for it. Most often desktop scales down gracefully to tablet' +
-            ' - verify with the project team whether a dedicated tablet design is needed.' +
-            '\n\nIf produced, design at 768px width.',
-    Desk:   'Primary design viewport. Design all main pages at 1280px.' +
-            '\n\nContent should sit within the column grid. If content should not stretch to full screen width,' +
-            ' define a max-width for content containers in the project stylesheet.',
-    Cinema: 'Wide viewport for screens 1536px and above.' +
-            '\n\nAt this breakpoint, max-width constraints are critical. Content should not span the full canvas.' +
-            ' Define a container max-width so content stays centered while backgrounds can remain full-width.',
+  var bpLabels  = { Mob: 'Mob (360-768px)', Tab: 'Tab (768-1280px)', Desk: 'Desk (1280-1536px)', Wide: 'Wide (1536px+)' };
+  var bpRanges  = { Mob: '0 - 767', Tab: '768 - 1279', Desk: '1280 - 1535', Wide: '1536+' };
+  var purposes  = {
+    Mob:  'Grid for mobile devices. All units should have the same column count.' +
+          '\n\nFor mobile, the design should be scalable to at least 320px for accessibility reasons.' +
+          ' Hand over all designs at the same frame size: 360x660px or 390x720px.' +
+          '\n\nThis excludes browser and OS UI from the viewport.',
+    Tab:  'Grid for tablet viewports.' +
+          '\n\nTablet is produced when the project has time for it. Most often desktop scales down gracefully to tablet' +
+          ' - verify with the project team whether a dedicated tablet design is needed.' +
+          '\n\nIf produced, design at 768px width.',
+    Desk: 'Primary design viewport. Design all main pages at 1280px.' +
+          '\n\nContent should sit within the column grid. If content should not stretch to full screen width,' +
+          ' define a max-width for content containers in the project stylesheet.',
+    Wide: 'Wide viewport for screens 1536px and above.' +
+          '\n\nAt this breakpoint, max-width constraints are critical. Content should not span the full canvas.' +
+          ' Define a container max-width so content stays centered while backgrounds can remain full-width.',
   };
 
   // Row frame
@@ -954,44 +944,71 @@ async function buildGridBreakpoint(outer, data, label, docComp, gridSlotComp, ot
     }
   } catch(e) {}
 
-  // Column visual frame
+  // Column visual - auto-layout frame with named column rects
   var vizFrame = figma.createFrame();
   vizFrame.name = 'GridFrame';
-  vizFrame.clipsContent = true;
+  vizFrame.clipsContent = false;
   vizFrame.cornerRadius = 8;
-  vizFrame.layoutAlign = 'STRETCH';
+  vizFrame.layoutAlign = 'STRETCH';      // fills row height
   vizFrame.primaryAxisSizingMode = 'FIXED';
   vizFrame.counterAxisSizingMode = 'AUTO';
   vizFrame.resize(vizW, 100);
 
-  // Background: try --ui-bg-background variable, fallback to white
+  // Auto-layout: margin = padding, gutter = item spacing
+  vizFrame.layoutMode = 'HORIZONTAL';
+  vizFrame.paddingLeft = margin;
+  vizFrame.paddingRight = margin;
+  vizFrame.paddingTop = 0;
+  vizFrame.paddingBottom = 0;
+  vizFrame.itemSpacing = gutter;
+
+  // Background via --ui-bg-background variable
   var bgVar = findCssVariable('--ui-bg-background');
   var bgFill = { type: 'SOLID', color: { r: 1, g: 1, b: 1 } };
   try {
     if (bgVar) {
-      var col = figma.variables.getVariableCollectionById(bgVar.variableCollectionId);
-      var mid = col ? col.defaultModeId : null;
-      var rawBg = mid ? bgVar.valuesByMode[mid] : bgVar.valuesByMode[Object.keys(bgVar.valuesByMode)[0]];
-      var resBg = rawBg ? resolveColor(rawBg, mid) : null;
-      if (resBg) bgFill = { type: 'SOLID', color: { r: resBg.rgba.r, g: resBg.rgba.g, b: resBg.rgba.b }, opacity: resBg.rgba.a };
+      var bgCol = figma.variables.getVariableCollectionById(bgVar.variableCollectionId);
+      var bgMid = bgCol ? bgCol.defaultModeId : null;
+      var rawBg = bgMid ? bgVar.valuesByMode[bgMid] : bgVar.valuesByMode[Object.keys(bgVar.valuesByMode)[0]];
+      var resBg = rawBg ? resolveColor(rawBg, bgMid) : null;
+      if (resBg) bgFill = { type: 'SOLID', color: { r: resBg.rgba.r, g: resBg.rgba.g, b: resBg.rgba.b } };
       vizFrame.fills = [figma.variables.setBoundVariableForPaint(bgFill, 'color', bgVar)];
     } else {
       vizFrame.fills = [bgFill];
     }
-  } catch(e) {
-    vizFrame.fills = [bgFill];
-  }
+  } catch(e) { vizFrame.fills = [bgFill]; }
 
   rowFrame.appendChild(vizFrame);
 
-  // Draw columns
+  // Find --col-semantic-red variable
+  var redVar = findCssVariable('--col-semantic-red');
+  var redFill = { type: 'SOLID', color: { r: 1, g: 0.2, b: 0.2 } };
+  if (redVar) {
+    try {
+      var redCol = figma.variables.getVariableCollectionById(redVar.variableCollectionId);
+      var redMid = redCol ? redCol.defaultModeId : null;
+      var rawRed = redMid ? redVar.valuesByMode[redMid] : redVar.valuesByMode[Object.keys(redVar.valuesByMode)[0]];
+      var resRed = rawRed ? resolveColor(rawRed, redMid) : null;
+      if (resRed) redFill = { type: 'SOLID', color: { r: resRed.rgba.r, g: resRed.rgba.g, b: resRed.rgba.b } };
+    } catch(e) {}
+  }
+
+  // Column rects: fill height + equal width via layoutGrow
   for (var ci = 0; ci < columns; ci++) {
+    var num = ci + 1;
+    var colName = 'Column' + (num < 10 ? '0' : '') + num;
     var colRect = figma.createRectangle();
-    colRect.x = margin + ci * (colWidth + gutter);
-    colRect.y = 0;
-    colRect.resize(colWidth, 2000);
-    colRect.fills = [{ type: 'SOLID', color: { r: 0.54, g: 0.22, b: 0.96 }, opacity: 0.15 }];
-    colRect.cornerRadius = 2;
+    colRect.name = colName;
+    colRect.opacity = 0.5;             // 50% layer opacity
+    colRect.layoutGrow = 1;            // fills primary axis equally
+    colRect.layoutAlign = 'STRETCH';   // fills counter axis (height)
+
+    if (redVar) {
+      try { colRect.fills = [figma.variables.setBoundVariableForPaint(redFill, 'color', redVar)]; }
+      catch(e) { colRect.fills = [redFill]; }
+    } else {
+      colRect.fills = [redFill];
+    }
     vizFrame.appendChild(colRect);
   }
 }
