@@ -1,6 +1,6 @@
 // Grebbans Handover - v9.0
 
-var VERSION = '9.5';
+var VERSION = '9.6';
 var FRAME_W = 1504;
 var GRID_W  = 1616; // 320 doc + 16 gap + 1280 desk grid
 
@@ -288,10 +288,11 @@ async function buildPrimitivesFrame(col, wrapper) {
   outer.fills = []; outer.clipsContent = false;
   outer.layoutMode = 'HORIZONTAL'; outer.itemSpacing = 20;
   outer.layoutAlign = 'STRETCH'; outer.primaryAxisSizingMode = 'FIXED'; outer.counterAxisSizingMode = 'AUTO';
-  if (isNew) outer.resize(FRAME_W, 100);
+  outer.resize(FRAME_W, 10); // always reset; height hugs via AUTO
 
   // Always ensure doc panel exists (handles both new + update, and silent import failures)
-  var existingDocPrim = outer.findOne(function(n) { return n.type === 'INSTANCE' && n.componentId !== undefined && n.componentId !== null; });
+  // Check first direct child only - avoids matching card instances in content frames
+  var existingDocPrim = (outer.children.length > 0 && outer.children[0].type === 'INSTANCE') ? outer.children[0] : null;
   if (!existingDocPrim) {
     try {
       var docComp = await figma.importComponentByKeyAsync(KEYS.docModule);
@@ -397,9 +398,10 @@ async function buildThemesFrame(col, wrapper) {
   outer.fills = []; outer.clipsContent = false;
   outer.layoutMode = 'HORIZONTAL'; outer.itemSpacing = 20;
   outer.layoutAlign = 'STRETCH'; outer.primaryAxisSizingMode = 'FIXED'; outer.counterAxisSizingMode = 'AUTO';
-  if (isNew) outer.resize(FRAME_W, 100);
+  outer.resize(FRAME_W, 10); // always reset; height hugs via AUTO
 
-  var existingDocTheme = outer.findOne(function(n) { return n.type === 'INSTANCE' && n.componentId !== undefined && n.componentId !== null; });
+  // Check first direct child only - avoids matching card instances in content frames
+  var existingDocTheme = (outer.children.length > 0 && outer.children[0].type === 'INSTANCE') ? outer.children[0] : null;
   if (!existingDocTheme) {
     try {
       var docComp = await figma.importComponentByKeyAsync(KEYS.docModule);
@@ -486,7 +488,7 @@ function effectToCss(effects) {
       var cl = e.color;
       var inset = e.type === 'INNER_SHADOW' ? 'inset ' : '';
       var spread = e.spread !== undefined ? e.spread : 0;
-      // Always show raw rgba — variable name is shown separately as a datapoint
+      // Always show raw rgba - variable name is shown separately as a datapoint
       var colourValue = 'rgba(' + Math.round(cl.r*255) + ',' + Math.round(cl.g*255) + ',' + Math.round(cl.b*255) + ',' + Math.round(cl.a*100)/100 + ')';
       parts.push(inset + e.offset.x + 'px ' + e.offset.y + 'px ' + e.radius + 'px ' + spread + 'px ' + colourValue);
     } else if (e.type === 'LAYER_BLUR' || e.type === 'BACKGROUND_BLUR') {
@@ -516,9 +518,9 @@ async function buildGradientsFrame(wrapper) {
   outer.fills = []; outer.clipsContent = false;
   outer.layoutMode = 'HORIZONTAL'; outer.itemSpacing = 20;
   outer.layoutAlign = 'STRETCH'; outer.primaryAxisSizingMode = 'FIXED'; outer.counterAxisSizingMode = 'AUTO';
-  if (isNew) outer.resize(FRAME_W, 100);
-  if (isNew) { outer.primaryAxisSizingMode = 'FIXED'; outer.counterAxisSizingMode = 'AUTO'; outer.resize(FRAME_W, 100); }
-  var existingDocGrad = outer.findOne(function(n) { return n.type === 'INSTANCE' && n.componentId !== undefined && n.componentId !== null; });
+  outer.resize(FRAME_W, 10); // always reset; height hugs via AUTO
+  // Check first direct child only - avoids matching card instances in content frames
+  var existingDocGrad = (outer.children.length > 0 && outer.children[0].type === 'INSTANCE') ? outer.children[0] : null;
   if (!existingDocGrad) {
     try {
       var docComp = await figma.importComponentByKeyAsync(KEYS.docModule);
@@ -541,7 +543,7 @@ async function buildGradientsFrame(wrapper) {
   content.layoutMode = 'HORIZONTAL'; content.layoutWrap = 'WRAP';
   content.itemSpacing = 4; content.counterAxisSpacing = 4;
   content.primaryAxisSizingMode = 'FIXED'; content.counterAxisSizingMode = 'AUTO';
-  content.resize(FRAME_W - 320 - 20, 100);
+  content.resize(FRAME_W - 320 - 20, 10); // reset height so it hugs on update
   for (var gi = 0; gi < gradients.length; gi++) {
     var grad = gradients[gi];
     var inst = gradComp.createInstance();
@@ -593,8 +595,9 @@ async function buildEffectsFrame(wrapper) {
   outer.fills = []; outer.clipsContent = false;
   outer.layoutMode = 'HORIZONTAL'; outer.itemSpacing = 20;
   outer.layoutAlign = 'STRETCH'; outer.primaryAxisSizingMode = 'FIXED'; outer.counterAxisSizingMode = 'AUTO';
-  if (isNew) outer.resize(FRAME_W, 100);
-  var existingDocEff = outer.findOne(function(n) { return n.type === 'INSTANCE' && n.componentId !== undefined && n.componentId !== null; });
+  outer.resize(FRAME_W, 10); // always reset; height hugs via AUTO
+  // Check first direct child only - avoids matching card instances in content frames
+  var existingDocEff = (outer.children.length > 0 && outer.children[0].type === 'INSTANCE') ? outer.children[0] : null;
   if (!existingDocEff) {
     try {
       var docComp2 = await figma.importComponentByKeyAsync(KEYS.docModule);
@@ -617,7 +620,7 @@ async function buildEffectsFrame(wrapper) {
   content2.fills = []; content2.clipsContent = false;
   content2.layoutMode = 'HORIZONTAL'; content2.layoutWrap = 'WRAP';
   content2.itemSpacing = 4; content2.counterAxisSpacing = 4;
-  content2.resize(effW, 100);
+  content2.resize(effW, 10); // reset height so it hugs on update
   content2.primaryAxisSizingMode = 'AUTO'; content2.counterAxisSizingMode = 'FIXED';
   for (var ei = 0; ei < effects.length; ei++) {
     var eff = effects[ei];
