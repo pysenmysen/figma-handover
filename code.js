@@ -273,9 +273,9 @@ async function buildTypography() {
   var outer = getOrCreateFrame('Doc/Typography');
   outer.fills = []; outer.clipsContent = false;
   outer.layoutMode = 'VERTICAL'; outer.itemSpacing = 16;
-  outer.primaryAxisSizingMode = 'AUTO';
   outer.counterAxisSizingMode = 'FIXED';
-  outer.resize(FRAME_W, 100);
+  outer.primaryAxisSizingMode = 'AUTO';
+  outer.resize(FRAME_W, outer.height || 100); // only fix width, let height hug
 
   var purposes = {
     'Primary':   'Used for headings and display text.',
@@ -383,14 +383,18 @@ async function buildTypography() {
     var cardW = isMisc ? 582 : colW;
     var stylesCol = figma.createFrame();
     stylesCol.name = 'TextStyles'; stylesCol.fills = [];
-    stylesCol.resize(colW, 100);
-    stylesCol.primaryAxisSizingMode = 'AUTO'; stylesCol.counterAxisSizingMode = 'FIXED';
     stylesCol.layoutGrow = 1; stylesCol.layoutAlign = 'INHERIT';
     if (isMisc) {
       stylesCol.layoutMode = 'HORIZONTAL'; stylesCol.layoutWrap = 'WRAP';
       stylesCol.itemSpacing = 4; stylesCol.counterAxisSpacing = 4;
+      // HORIZONTAL: primary=width (FIXED), counter=height (AUTO/hug)
+      stylesCol.primaryAxisSizingMode = 'FIXED'; stylesCol.counterAxisSizingMode = 'AUTO';
+      stylesCol.resize(colW, 100);
     } else {
       stylesCol.layoutMode = 'VERTICAL'; stylesCol.itemSpacing = 4;
+      // VERTICAL: primary=height (AUTO/hug), counter=width (FIXED)
+      stylesCol.primaryAxisSizingMode = 'AUTO'; stylesCol.counterAxisSizingMode = 'FIXED';
+      stylesCol.resize(colW, 100);
     }
     secRow.appendChild(stylesCol);
 
