@@ -1,6 +1,6 @@
 // Grebbans Handover - v9.0
 
-var VERSION = '9.3';
+var VERSION = '9.4';
 var FRAME_W = 1504;
 var GRID_W  = 1616; // 320 doc + 16 gap + 1280 desk grid
 
@@ -275,11 +275,13 @@ async function buildPrimitivesFrame(col) {
   outer.layoutMode = 'HORIZONTAL'; outer.itemSpacing = 20;
   if (isNew) { outer.primaryAxisSizingMode = 'FIXED'; outer.counterAxisSizingMode = 'AUTO'; outer.resize(FRAME_W, 100); }
 
-  if (isNew) {
+  // Always ensure doc panel exists (handles both new + update, and silent import failures)
+  var existingDocPrim = outer.findOne(function(n) { return n.type === 'INSTANCE' && n.componentId !== undefined && n.componentId !== null; });
+  if (!existingDocPrim) {
     try {
       var docComp = await figma.importComponentByKeyAsync(KEYS.docModule);
       var docInst = docComp.createInstance();
-      outer.appendChild(docInst);
+      outer.insertChild(0, docInst);
       var docProps = {
         'Epic#134:14': 'Colour',
         'Instance/State#134:16': col.name,
@@ -380,11 +382,12 @@ async function buildThemesFrame(col) {
   outer.layoutMode = 'HORIZONTAL'; outer.itemSpacing = 20;
   if (isNew) { outer.primaryAxisSizingMode = 'FIXED'; outer.counterAxisSizingMode = 'AUTO'; outer.resize(FRAME_W, 100); }
 
-  if (isNew) {
+  var existingDocTheme = outer.findOne(function(n) { return n.type === 'INSTANCE' && n.componentId !== undefined && n.componentId !== null; });
+  if (!existingDocTheme) {
     try {
       var docComp = await figma.importComponentByKeyAsync(KEYS.docModule);
       var docInst = docComp.createInstance();
-      outer.appendChild(docInst);
+      outer.insertChild(0, docInst);
       var docProps = {
         'Epic#134:14': 'Colour',
         'Instance/State#134:16': col.name,
@@ -499,11 +502,12 @@ async function buildGradientsFrame() {
   outer.fills = []; outer.clipsContent = false;
   outer.layoutMode = 'HORIZONTAL'; outer.itemSpacing = 20;
   if (isNew) { outer.primaryAxisSizingMode = 'FIXED'; outer.counterAxisSizingMode = 'AUTO'; outer.resize(FRAME_W, 100); }
-  if (isNew) {
+  var existingDocGrad = outer.findOne(function(n) { return n.type === 'INSTANCE' && n.componentId !== undefined && n.componentId !== null; });
+  if (!existingDocGrad) {
     try {
       var docComp = await figma.importComponentByKeyAsync(KEYS.docModule);
       var docInst = docComp.createInstance();
-      outer.appendChild(docInst);
+      outer.insertChild(0, docInst);
       var docProps = { 'Epic#134:14': 'Styles', 'Instance/State#134:16': 'Gradients', 'Purpose#134:18': 'Gradient paint styles used across the project.' };
       try {
         var dp = docInst.componentProperties;
@@ -572,11 +576,12 @@ async function buildEffectsFrame() {
   outer.fills = []; outer.clipsContent = false;
   outer.layoutMode = 'HORIZONTAL'; outer.itemSpacing = 20;
   if (isNew) { outer.primaryAxisSizingMode = 'FIXED'; outer.counterAxisSizingMode = 'AUTO'; outer.resize(FRAME_W, 100); }
-  if (isNew) {
+  var existingDocEff = outer.findOne(function(n) { return n.type === 'INSTANCE' && n.componentId !== undefined && n.componentId !== null; });
+  if (!existingDocEff) {
     try {
       var docComp2 = await figma.importComponentByKeyAsync(KEYS.docModule);
       var docInst2 = docComp2.createInstance();
-      outer.appendChild(docInst2);
+      outer.insertChild(0, docInst2);
       var docProps2 = { 'Epic#134:14': 'Styles', 'Instance/State#134:16': 'Effects', 'Purpose#134:18': 'Effect styles (shadows and blurs) used across the project.' };
       try {
         var dp2 = docInst2.componentProperties;
