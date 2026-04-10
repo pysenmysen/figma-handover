@@ -693,7 +693,7 @@ var GRID_BP_PURPOSES = {
         '\n\nTablet is produced when the project has time for it. Most often desktop scales down gracefully to tablet' +
         ' - verify with the project team whether a dedicated tablet design is needed.' +
         '\n\nIf produced, design at 768x1024px.',
-  Desk: 'Primary design viewport. Design at 1280px. Make sure the design is scaleable to 1280x720px as a minimum' +
+  Desk: 'Design at 1280px. Make sure the design is scaleable to 1280x720px as a minimum' +
         ' - desktop can also be designed at 1536x864px if needed, but always verify at the smallest size.' +
         '\n\nContent should sit within the column grid. Define a max-width for content containers in the' +
         ' project stylesheet if content should not stretch to full screen width.',
