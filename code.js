@@ -355,11 +355,17 @@ async function buildTypography() {
         var tsInst = typoSlot.createInstance();
         sectionsSlot.appendChild(tsInst);
 
-        // Row 0 = FontFamily row — set both text nodes in FontContainer
+        // Row 0 = FontFamily row — Font-family = family name, Font varible = CSS var
         try {
           var ffRow = tsInst.children[0];
+          var cssVar = '--font-' + gKey.toLowerCase();
           var ffNodes = ffRow.findAll(function(n) { return n.type === 'TEXT' && n.name !== 'Label'; });
-          ffNodes.forEach(function(n) { try { n.characters = fontFamily; } catch(e) {} });
+          ffNodes.forEach(function(n) {
+            try {
+              if (n.name === 'Font varible') { n.characters = cssVar; }
+              else { n.characters = fontFamily; }
+            } catch(e) {}
+          });
         } catch(e) {}
 
         // Row 1 = Weights row — find the value text node
@@ -410,11 +416,12 @@ async function buildTypography() {
         });
       } catch(e) {}
 
-      // Apply text style THEN override characters so content wins
+      // Apply text style THEN load font + override characters so content wins
       try {
         var previewT = inst.findOne(function(n) { return n.name === 'TextStyle' && n.type === 'TEXT'; });
         if (previewT) {
           try { previewT.textStyleId = style.id; } catch(e) {}
+          try { await figma.loadFontAsync(style.fontName); } catch(e) {}
           try { previewT.characters = previewContent; } catch(e) {}
         }
       } catch(e) {}
