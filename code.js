@@ -109,9 +109,9 @@ function placeFrame(frame) {
 // If modes are set before resize(), resize() overrides AUTO and locks height.
 
 // VERTICAL, fixed width, hug height
-function configDocRows(frame, width) {
+function configDocRows(frame, width, gap) {
   frame.fills = []; frame.clipsContent = false;
-  frame.layoutMode = 'VERTICAL'; frame.itemSpacing = 4;
+  frame.layoutMode = 'VERTICAL'; frame.itemSpacing = gap !== undefined ? gap : 4;
   frame.layoutAlign = 'STRETCH';
   frame.resize(width || CONTENT_W, frame.height > 10 ? frame.height : 100);
   frame.counterAxisSizingMode = 'FIXED'; // fix width
@@ -286,7 +286,7 @@ async function buildColoursAll() {
   var wrapper = findExistingFrame('Doc/Colour');
   var isNew = !wrapper;
   if (isNew) { wrapper = figma.createFrame(); wrapper.name = 'Doc/Colour'; figma.currentPage.appendChild(wrapper); }
-  configDocRows(wrapper, FRAME_W);
+  configDocRows(wrapper, FRAME_W, 16);
 
   var collections = figma.variables.getLocalVariableCollections();
   for (var i = 0; i < collections.length; i++) {
@@ -548,7 +548,7 @@ async function buildTypography() {
   });
 
   var outer = getOrCreateFrame('Doc/Typography');
-  configDocRows(outer, FRAME_W);
+  configDocRows(outer, FRAME_W, 16);
 
   var purposes = {
     Primary:   'Used for headings and display text.',
@@ -731,7 +731,7 @@ async function buildGrid() {
   var otherComp    = await figma.importComponentByKeyAsync(KEYS.sectionOther);
 
   var outer = getOrCreateFrame('Doc/Grid');
-  configDocRows(outer, FRAME_W);
+  configDocRows(outer, FRAME_W, 16);
 
   for (var i = 0; i < colStyles.length; i++) {
     var gs = colStyles[i];

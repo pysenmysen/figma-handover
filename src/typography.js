@@ -21,7 +21,7 @@ async function buildTypography() {
   });
 
   var outer = getOrCreateFrame('Doc/Typography');
-  configDocRows(outer, FRAME_W);
+  configDocRows(outer, FRAME_W, 16);
 
   var purposes = {
     Primary:   'Used for headings and display text.',

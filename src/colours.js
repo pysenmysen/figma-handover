@@ -4,7 +4,7 @@ async function buildColoursAll() {
   var wrapper = findExistingFrame('Doc/Colour');
   var isNew = !wrapper;
   if (isNew) { wrapper = figma.createFrame(); wrapper.name = 'Doc/Colour'; figma.currentPage.appendChild(wrapper); }
-  configDocRows(wrapper, FRAME_W);
+  configDocRows(wrapper, FRAME_W, 16);
 
   var collections = figma.variables.getLocalVariableCollections();
   for (var i = 0; i < collections.length; i++) {

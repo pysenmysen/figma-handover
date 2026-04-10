@@ -51,7 +51,7 @@ async function buildGrid() {
   var otherComp    = await figma.importComponentByKeyAsync(KEYS.sectionOther);
 
   var outer = getOrCreateFrame('Doc/Grid');
-  configDocRows(outer, FRAME_W);
+  configDocRows(outer, FRAME_W, 16);
 
   for (var i = 0; i < colStyles.length; i++) {
     var gs = colStyles[i];

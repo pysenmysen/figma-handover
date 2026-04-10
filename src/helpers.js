@@ -80,9 +80,9 @@ function placeFrame(frame) {
 // If modes are set before resize(), resize() overrides AUTO and locks height.
 
 // VERTICAL, fixed width, hug height
-function configDocRows(frame, width) {
+function configDocRows(frame, width, gap) {
   frame.fills = []; frame.clipsContent = false;
-  frame.layoutMode = 'VERTICAL'; frame.itemSpacing = 4;
+  frame.layoutMode = 'VERTICAL'; frame.itemSpacing = gap !== undefined ? gap : 4;
   frame.layoutAlign = 'STRETCH';
   frame.resize(width || CONTENT_W, frame.height > 10 ? frame.height : 100);
   frame.counterAxisSizingMode = 'FIXED'; // fix width
