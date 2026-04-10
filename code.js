@@ -427,9 +427,10 @@ async function buildTypography() {
         ? 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nisi, gravida mauris ut lectus blandit tortor hendrerit. Commodo adipiscing et in vitae auctor diam amet, est est.'
         : 'Label';
 
+      // Split into two calls: Type swap first, then text props
+      try { inst.setProperties({ 'Type': variantType }); } catch(e) {}
       try {
         inst.setProperties({
-          'Type':                  variantType,
           'Style name#238:110':    sName,
           'Font-size#205:43':      fs,
           'Line-height#205:47':    lh,
