@@ -2,6 +2,7 @@
 
 var VERSION = '9.0';
 var FRAME_W = 1504;
+var GRID_W  = 1616; // 320 doc + 16 gap + 1280 desk grid
 
 var KEYS = {
   docModule:       '8df1ea68f02f91062978acb1ccbab2cec2e92171',
@@ -214,6 +215,18 @@ function placeFrame(frame) {
   figma.viewport.scrollAndZoomIntoView([frame]);
 }
 
+
+function findCssVariable(cssName) {
+  var target = cssName.replace(/^--/, '');
+  var allVars = figma.variables.getLocalVariables();
+  for (var i = 0; i < allVars.length; i++) {
+    var v = allVars[i];
+    if (v.resolvedType !== 'COLOR') continue;
+    var vCss = v.name.split('/').join('-').toLowerCase();
+    if (vCss === target) return v;
+  }
+  return null;
+}
 // ============================================================
 // COLOURS MODULE
 // ============================================================
@@ -850,7 +863,7 @@ async function buildGrid() {
   outer.fills = []; outer.clipsContent = false;
   outer.layoutMode = 'VERTICAL'; outer.itemSpacing = 16;
   outer.counterAxisSizingMode = 'FIXED'; outer.primaryAxisSizingMode = 'AUTO';
-  outer.resize(FRAME_W, outer.height || 100);
+  outer.resize(GRID_W, outer.height || 100);
 
   for (var i = 0; i < gridData.length; i++) {
     var data = gridData[i];
@@ -863,17 +876,38 @@ async function buildGrid() {
 
 async function buildGridBreakpoint(outer, data, label, docComp, gridSlotComp, otherComp) {
   var g = data.grid;
-  var w = data.width;
   var columns  = g.count;
   var gutter   = Math.round(g.gutterSize);
   var margin   = Math.round(g.offset);
-  var colWidth = (w - 2 * margin - (columns - 1) * gutter) / columns;
 
-  var purpose = 'Grid for mobile devices. All units should have the same column count.\n\nFor mobile, the design should be scalable to at least 320px for accessibility reasons. Hand over all designs at the same frame size: 360x660px or 390x720px\n\nThis excludes browser and OS UI from the viewport.';
-  var bpLabel  = label === 'Mob' ? 'Mob (360-768px)' : label === 'Tab' ? 'Tab (768-1280px)' : label === 'Desk' ? 'Desk (1280-1536px)' : 'Cinema (1536px+)';
-  var bpRange  = label === 'Mob' ? '0 - 767' : label === 'Tab' ? '768 - 1279' : label === 'Desk' ? '1280 - 1535' : '1536+';
-  if (label !== 'Mob') purpose = 'Grid for ' + label.toLowerCase() + ' viewports.';
+  // Fixed display widths per breakpoint
+  var vizWidths = { Mob: 360, Tab: 768, Desk: 1280, Cinema: GRID_W - 320 - 16 };
+  var vizW = vizWidths[label] || 360;
+  var isCinema = label === 'Cinema';
 
+  // Column width from actual grid data
+  var colWidth = (vizW - 2 * margin - (columns - 1) * gutter) / columns;
+
+  var bpLabels = { Mob: 'Mob (360-768px)', Tab: 'Tab (768-1280px)', Desk: 'Desk (1280-1536px)', Cinema: 'Cinema (1536px+)' };
+  var bpRanges = { Mob: '0 - 767', Tab: '768 - 1279', Desk: '1280 - 1535', Cinema: '1536+' };
+  var purposes = {
+    Mob:    'Grid for mobile devices. All units should have the same column count.' +
+            '\n\nFor mobile, the design should be scalable to at least 320px for accessibility reasons.' +
+            ' Hand over all designs at the same frame size: 360x660px or 390x720px.' +
+            '\n\nThis excludes browser and OS UI from the viewport.',
+    Tab:    'Grid for tablet viewports.' +
+            '\n\nTablet is produced when the project has time for it. Most often desktop scales down gracefully to tablet' +
+            ' - verify with the project team whether a dedicated tablet design is needed.' +
+            '\n\nIf produced, design at 768px width.',
+    Desk:   'Primary design viewport. Design all main pages at 1280px.' +
+            '\n\nContent should sit within the column grid. If content should not stretch to full screen width,' +
+            ' define a max-width for content containers in the project stylesheet.',
+    Cinema: 'Wide viewport for screens 1536px and above.' +
+            '\n\nAt this breakpoint, max-width constraints are critical. Content should not span the full canvas.' +
+            ' Define a container max-width so content stays centered while backgrounds can remain full-width.',
+  };
+
+  // Row frame
   var rowFrame = figma.createFrame();
   rowFrame.name = label + 'Grid';
   rowFrame.fills = [];
@@ -882,18 +916,20 @@ async function buildGridBreakpoint(outer, data, label, docComp, gridSlotComp, ot
   rowFrame.layoutAlign = 'STRETCH';
   outer.appendChild(rowFrame);
 
+  // Doc panel
   var docInst = docComp.createInstance();
   rowFrame.appendChild(docInst);
   try {
     docInst.setProperties({
       'Epic#134:14':           'Grid',
-      'Instance/State#134:16': bpLabel,
-      'Purpose#134:18':        purpose,
+      'Instance/State#134:16': bpLabels[label] || label,
+      'Purpose#134:18':        purposes[label] || '',
       'Show purpose#227:81':   true,
       'Show sections#226:79':  true,
     });
   } catch(e) {}
 
+  // Sections: Slots/Grid + Slots/Other
   try {
     var sectionsSlot = docInst.findOne(function(n) { return n.name === 'Sections'; });
     if (sectionsSlot) {
@@ -902,7 +938,7 @@ async function buildGridBreakpoint(outer, data, label, docComp, gridSlotComp, ot
       sectionsSlot.appendChild(gridSlot);
       try {
         gridSlot.setProperties({
-          'Breakpoint#247:118': bpRange,
+          'Breakpoint#247:118': bpRanges[label] || '',
           'Columns#247:120':    String(columns),
           'Margin#247:122':     margin + 'px',
           'Gutter#247:124':     gutter + 'px',
@@ -918,17 +954,37 @@ async function buildGridBreakpoint(outer, data, label, docComp, gridSlotComp, ot
     }
   } catch(e) {}
 
+  // Column visual frame
   var vizFrame = figma.createFrame();
   vizFrame.name = 'GridFrame';
   vizFrame.clipsContent = true;
-  vizFrame.fills = [];
   vizFrame.cornerRadius = 8;
   vizFrame.layoutAlign = 'STRETCH';
   vizFrame.primaryAxisSizingMode = 'FIXED';
   vizFrame.counterAxisSizingMode = 'AUTO';
-  vizFrame.resize(w, 100);
+  vizFrame.resize(vizW, 100);
+
+  // Background: try --ui-bg-background variable, fallback to white
+  var bgVar = findCssVariable('--ui-bg-background');
+  var bgFill = { type: 'SOLID', color: { r: 1, g: 1, b: 1 } };
+  try {
+    if (bgVar) {
+      var col = figma.variables.getVariableCollectionById(bgVar.variableCollectionId);
+      var mid = col ? col.defaultModeId : null;
+      var rawBg = mid ? bgVar.valuesByMode[mid] : bgVar.valuesByMode[Object.keys(bgVar.valuesByMode)[0]];
+      var resBg = rawBg ? resolveColor(rawBg, mid) : null;
+      if (resBg) bgFill = { type: 'SOLID', color: { r: resBg.rgba.r, g: resBg.rgba.g, b: resBg.rgba.b }, opacity: resBg.rgba.a };
+      vizFrame.fills = [figma.variables.setBoundVariableForPaint(bgFill, 'color', bgVar)];
+    } else {
+      vizFrame.fills = [bgFill];
+    }
+  } catch(e) {
+    vizFrame.fills = [bgFill];
+  }
+
   rowFrame.appendChild(vizFrame);
 
+  // Draw columns
   for (var ci = 0; ci < columns; ci++) {
     var colRect = figma.createRectangle();
     colRect.x = margin + ci * (colWidth + gutter);
