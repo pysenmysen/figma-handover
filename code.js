@@ -1,6 +1,6 @@
 // Grebbans Handover - v9.0
 
-var VERSION = '9.6';
+var VERSION = '9.7';
 var FRAME_W = 1504;
 var GRID_W  = 1616; // 320 doc + 16 gap + 1280 desk grid
 
@@ -288,7 +288,7 @@ async function buildPrimitivesFrame(col, wrapper) {
   outer.fills = []; outer.clipsContent = false;
   outer.layoutMode = 'HORIZONTAL'; outer.itemSpacing = 20;
   outer.layoutAlign = 'STRETCH'; outer.primaryAxisSizingMode = 'FIXED'; outer.counterAxisSizingMode = 'AUTO';
-  outer.resize(FRAME_W, 10); // always reset; height hugs via AUTO
+  if (isNew) outer.resize(FRAME_W, 100);
 
   // Always ensure doc panel exists (handles both new + update, and silent import failures)
   // Check first direct child only - avoids matching card instances in content frames
@@ -398,7 +398,7 @@ async function buildThemesFrame(col, wrapper) {
   outer.fills = []; outer.clipsContent = false;
   outer.layoutMode = 'HORIZONTAL'; outer.itemSpacing = 20;
   outer.layoutAlign = 'STRETCH'; outer.primaryAxisSizingMode = 'FIXED'; outer.counterAxisSizingMode = 'AUTO';
-  outer.resize(FRAME_W, 10); // always reset; height hugs via AUTO
+  if (isNew) outer.resize(FRAME_W, 100);
 
   // Check first direct child only - avoids matching card instances in content frames
   var existingDocTheme = (outer.children.length > 0 && outer.children[0].type === 'INSTANCE') ? outer.children[0] : null;
@@ -518,7 +518,7 @@ async function buildGradientsFrame(wrapper) {
   outer.fills = []; outer.clipsContent = false;
   outer.layoutMode = 'HORIZONTAL'; outer.itemSpacing = 20;
   outer.layoutAlign = 'STRETCH'; outer.primaryAxisSizingMode = 'FIXED'; outer.counterAxisSizingMode = 'AUTO';
-  outer.resize(FRAME_W, 10); // always reset; height hugs via AUTO
+  if (isNew) outer.resize(FRAME_W, 100);
   // Check first direct child only - avoids matching card instances in content frames
   var existingDocGrad = (outer.children.length > 0 && outer.children[0].type === 'INSTANCE') ? outer.children[0] : null;
   if (!existingDocGrad) {
@@ -542,8 +542,9 @@ async function buildGradientsFrame(wrapper) {
   content.fills = []; content.clipsContent = false;
   content.layoutMode = 'HORIZONTAL'; content.layoutWrap = 'WRAP';
   content.itemSpacing = 4; content.counterAxisSpacing = 4;
-  content.primaryAxisSizingMode = 'FIXED'; content.counterAxisSizingMode = 'AUTO';
-  content.resize(FRAME_W - 320 - 20, 10); // reset height so it hugs on update
+  content.counterAxisSizingMode = 'AUTO'; // hug height
+  content.primaryAxisSizingMode = 'FIXED'; // fix width
+  if (!content.width || content.width < 100) content.resize(FRAME_W - 320 - 20, 100);
   for (var gi = 0; gi < gradients.length; gi++) {
     var grad = gradients[gi];
     var inst = gradComp.createInstance();
@@ -595,7 +596,7 @@ async function buildEffectsFrame(wrapper) {
   outer.fills = []; outer.clipsContent = false;
   outer.layoutMode = 'HORIZONTAL'; outer.itemSpacing = 20;
   outer.layoutAlign = 'STRETCH'; outer.primaryAxisSizingMode = 'FIXED'; outer.counterAxisSizingMode = 'AUTO';
-  outer.resize(FRAME_W, 10); // always reset; height hugs via AUTO
+  if (isNew) outer.resize(FRAME_W, 100);
   // Check first direct child only - avoids matching card instances in content frames
   var existingDocEff = (outer.children.length > 0 && outer.children[0].type === 'INSTANCE') ? outer.children[0] : null;
   if (!existingDocEff) {
@@ -620,8 +621,9 @@ async function buildEffectsFrame(wrapper) {
   content2.fills = []; content2.clipsContent = false;
   content2.layoutMode = 'HORIZONTAL'; content2.layoutWrap = 'WRAP';
   content2.itemSpacing = 4; content2.counterAxisSpacing = 4;
-  content2.resize(effW, 10); // reset height so it hugs on update
-  content2.primaryAxisSizingMode = 'AUTO'; content2.counterAxisSizingMode = 'FIXED';
+  content2.primaryAxisSizingMode = 'FIXED'; // fix width
+  content2.counterAxisSizingMode = 'AUTO'; // hug height
+  if (!content2.width || content2.width < 100) content2.resize(effW, 100);
   for (var ei = 0; ei < effects.length; ei++) {
     var eff = effects[ei];
     var einst = effectComp.createInstance();
