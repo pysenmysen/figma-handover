@@ -131,7 +131,7 @@
   </div>
   <div class="footer">
     <div class="footer-note" id="footer-note">Style sheet frames are placed on the current page.</div>
-    <button class="btn-all" id="btn-all" onclick="buildAll()">Generate all</button>
+    <button class="btn-all" id="btn-all" onclick="buildAll()" style="display:none">Generate all</button>
   </div>
 </div>
 
@@ -167,6 +167,7 @@
 </div>
 
 <script>
+window.addEventListener('load', function() { var btn = document.getElementById('btn-all'); if(btn) btn.style.display = ''; });
 var items = [];
 var activeItem = null;
 
@@ -300,6 +301,9 @@ function switchTab(tab) {
   event.target.classList.add('active');
   document.querySelectorAll('.tab-content').forEach(function(el) { el.classList.remove('active'); });
   document.getElementById('tab-' + tab).classList.add('active');
+  // Show Generate all only on stylesheet tab
+  var btn = document.getElementById('btn-all');
+  if (btn) btn.style.display = tab === 'stylesheet' ? '' : 'none';
 }
 
 function show(id) {

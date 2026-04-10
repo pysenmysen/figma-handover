@@ -25,15 +25,15 @@ function styleSelectedFrames() {
     } catch(e) {}
 
     // Corner radius
-    try { node.cornerRadius = 5; } catch(e) {}
+    try { node.cornerRadius = 12; } catch(e) {}
 
     // Auto-layout: VERTICAL, hug both axes, 24px padding, 10px gap
     try {
       node.layoutMode = 'VERTICAL';
       node.primaryAxisSizingMode = 'AUTO';
       node.counterAxisSizingMode = 'AUTO';
-      node.paddingTop = 24; node.paddingBottom = 24;
-      node.paddingLeft = 24; node.paddingRight = 24;
+      node.paddingTop = 32; node.paddingBottom = 32;
+      node.paddingLeft = 32; node.paddingRight = 32;
       node.itemSpacing = 10;
     } catch(e) {}
 
