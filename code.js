@@ -1,6 +1,6 @@
 // Grebbans Handover - v9.0
 
-var VERSION = '9.2';
+var VERSION = '9.3';
 var FRAME_W = 1504;
 var GRID_W  = 1616; // 320 doc + 16 gap + 1280 desk grid
 
@@ -850,7 +850,7 @@ async function buildGrid() {
   outer.fills = []; outer.clipsContent = false;
   outer.layoutMode = 'VERTICAL'; outer.itemSpacing = 16;
   outer.counterAxisSizingMode = 'FIXED'; outer.primaryAxisSizingMode = 'AUTO';
-  outer.resize(GRID_W, outer.height || 100);
+  outer.resize(FRAME_W, outer.height || 100);
 
   for (var i = 0; i < colStyles.length; i++) {
     var gs = colStyles[i];
@@ -875,8 +875,10 @@ async function buildGridBreakpoint(outer, colGrid, label, docComp, gridSlotComp,
   var margin   = Math.round(colGrid.offset);
 
   // Fixed display widths per breakpoint (Cinema fills remaining space)
-  var vizWidths = { Mob: 360, Tab: 768, Desk: 1280, Wide: GRID_W - 320 - 16 };
-  var vizW = vizWidths[label] || 360;
+  var vizWidths = { Mob: 360, Tab: 768, Desk: null, Wide: null };
+  var vizW = vizWidths[label];
+  var isFill = vizW === null;
+  if (isFill) vizW = FRAME_W - 320 - 16;
 
   var bpLabels  = { Mob: 'Mob (360-768px)', Tab: 'Tab (768-1280px)', Desk: 'Desk (1280-1536px)', Wide: 'Wide (1536px+)' };
   var bpRanges  = { Mob: '0 - 767', Tab: '768 - 1279', Desk: '1280 - 1535', Wide: '1536+' };
@@ -888,13 +890,15 @@ async function buildGridBreakpoint(outer, colGrid, label, docComp, gridSlotComp,
     Tab:  'Grid for tablet viewports.' +
           '\n\nTablet is produced when the project has time for it. Most often desktop scales down gracefully to tablet' +
           ' - verify with the project team whether a dedicated tablet design is needed.' +
-          '\n\nIf produced, design at 768px width.',
-    Desk: 'Primary design viewport. Design all main pages at 1280px.' +
-          '\n\nContent should sit within the column grid. If content should not stretch to full screen width,' +
-          ' define a max-width for content containers in the project stylesheet.',
-    Wide: 'Wide viewport for screens 1536px and above.' +
-          '\n\nAt this breakpoint, max-width constraints are critical. Content should not span the full canvas.' +
-          ' Define a container max-width so content stays centered while backgrounds can remain full-width.',
+          '\n\nIf produced, design at 768x1024px.',
+    Desk: 'Primary design viewport. Design at 1280px. Make sure the design is scaleable to 1280x720px as a minimum' +
+          ' - desktop can also be designed at 1536x864px if needed, but always verify at the smallest size.' +
+          '\n\nContent should sit within the column grid. Define a max-width for content containers in the' +
+          ' project stylesheet if content should not stretch to full screen width.',
+    Wide: 'Behavior documentation for wide screens (1536px+). No dedicated design is required at this breakpoint' +
+          ' - document how existing components and layouts should behave on larger screens.' +
+          '\n\nKey patterns to document: which containers have a max-width, which backgrounds span full-width,' +
+          ' and how content centers. This is template-level guidance, not project-specific implementation.',
   };
 
   // Row frame
@@ -953,6 +957,7 @@ async function buildGridBreakpoint(outer, colGrid, label, docComp, gridSlotComp,
   vizFrame.primaryAxisSizingMode = 'FIXED';
   vizFrame.counterAxisSizingMode = 'AUTO';
   vizFrame.resize(vizW, 100);
+  if (isFill) { vizFrame.layoutGrow = 1; } // fill remaining row width
 
   // Auto-layout: margin = padding, gutter = item spacing
   vizFrame.layoutMode = 'HORIZONTAL';
