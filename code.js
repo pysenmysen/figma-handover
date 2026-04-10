@@ -86,6 +86,17 @@ function clearChildren(frame) {
   while (frame.children.length > 0) frame.children[frame.children.length - 1].remove();
 }
 
+// Remove any legacy or duplicate FRAME children from an outer frame.
+// Keeps only INSTANCE children (i.e. the Doc/Default panel).
+// Call before getOrCreateSubFrame to avoid stale named frames accumulating.
+function clearLegacyFrames(outer) {
+  var toRemove = [];
+  for (var i = 0; i < outer.children.length; i++) {
+    if (outer.children[i].type === 'FRAME') toRemove.push(outer.children[i]);
+  }
+  toRemove.forEach(function(n) { n.remove(); });
+}
+
 function placeFrame(frame) {
   figma.viewport.scrollAndZoomIntoView([frame]);
 }
@@ -100,7 +111,7 @@ function placeFrame(frame) {
 // VERTICAL, fixed width, hug height
 function configDocRows(frame, width) {
   frame.fills = []; frame.clipsContent = false;
-  frame.layoutMode = 'VERTICAL'; frame.itemSpacing = 16;
+  frame.layoutMode = 'VERTICAL'; frame.itemSpacing = 4;
   frame.layoutAlign = 'STRETCH';
   frame.resize(width || CONTENT_W, frame.height > 10 ? frame.height : 100);
   frame.counterAxisSizingMode = 'FIXED'; // fix width
@@ -110,7 +121,7 @@ function configDocRows(frame, width) {
 // HORIZONTAL, fixed width, hug height
 function configDocCol(frame, width) {
   frame.fills = []; frame.clipsContent = false;
-  frame.layoutMode = 'HORIZONTAL'; frame.itemSpacing = 20;
+  frame.layoutMode = 'HORIZONTAL'; frame.itemSpacing = 4;
   frame.layoutAlign = 'STRETCH';
   frame.resize(width || FRAME_W, frame.height > 10 ? frame.height : 100);
   frame.primaryAxisSizingMode = 'FIXED'; // fix width
@@ -148,7 +159,7 @@ function createDocRow(parent, name) {
 // Sets horizontal auto-layout with fixed width + hug height (most common outer frame pattern)
 function setupOuterFrame(frame, isNew) {
   frame.fills = []; frame.clipsContent = false;
-  frame.layoutMode = 'HORIZONTAL'; frame.itemSpacing = 20;
+  frame.layoutMode = 'HORIZONTAL'; frame.itemSpacing = 4;
   frame.layoutAlign = 'STRETCH';
   // Set sizing modes before resize so AUTO height is respected
   frame.primaryAxisSizingMode = 'FIXED';
@@ -306,6 +317,7 @@ async function buildPrimitivesFrame(col, wrapper) {
     'Epic#134:14': 'Colour', 'Instance/State#134:16': col.name,
     'Purpose#134:18': 'Primitive colour tokens. Not used directly in project files - applied via semantic variables in themes/modes.',
   });
+  clearLegacyFrames(outer);
   var cr = getOrCreateSubFrame(outer, 'DocRows');
   var content = cr.frame;
   configDocRows(content, CONTENT_W);
@@ -366,6 +378,7 @@ async function buildThemesFrame(col, wrapper) {
     'Purpose#134:18': 'Semantic colour tokens mapped to primitives per mode. Each column must have its theme applied manually in Figma for the MCP to read the correct resolved colours.',
     'Show purpose#227:81': true,
   });
+  clearLegacyFrames(outer);
   var cr = getOrCreateSubFrame(outer, 'DocCol');
   var content = cr.frame;
   content.fills = []; content.layoutMode = 'HORIZONTAL'; content.itemSpacing = 4;
@@ -414,6 +427,7 @@ async function buildGradientsFrame(wrapper) {
   var outer = res.frame;
   configDocCol(outer, FRAME_W);
   await ensureDocPanel(outer, { 'Epic#134:14': 'Styles', 'Instance/State#134:16': 'Gradients', 'Purpose#134:18': 'Gradient paint styles used across the project.', 'Show purpose#227:81': true });
+  clearLegacyFrames(outer);
   var cr = getOrCreateSubFrame(outer, 'DocWrap');
   var content = cr.frame;
   configDocWrap(content, CONTENT_W);
@@ -466,6 +480,7 @@ async function buildEffectsFrame(wrapper) {
   var outer = res.frame;
   configDocCol(outer, FRAME_W);
   await ensureDocPanel(outer, { 'Epic#134:14': 'Styles', 'Instance/State#134:16': 'Effects', 'Purpose#134:18': 'Effect styles (shadows and blurs) used across the project.', 'Show purpose#227:81': true });
+  clearLegacyFrames(outer);
   var cr = getOrCreateSubFrame(outer, 'DocWrap');
   var content = cr.frame;
   configDocWrap(content, CONTENT_W);

@@ -35,6 +35,7 @@ async function buildPrimitivesFrame(col, wrapper) {
     'Epic#134:14': 'Colour', 'Instance/State#134:16': col.name,
     'Purpose#134:18': 'Primitive colour tokens. Not used directly in project files - applied via semantic variables in themes/modes.',
   });
+  clearLegacyFrames(outer);
   var cr = getOrCreateSubFrame(outer, 'DocRows');
   var content = cr.frame;
   configDocRows(content, CONTENT_W);
@@ -95,6 +96,7 @@ async function buildThemesFrame(col, wrapper) {
     'Purpose#134:18': 'Semantic colour tokens mapped to primitives per mode. Each column must have its theme applied manually in Figma for the MCP to read the correct resolved colours.',
     'Show purpose#227:81': true,
   });
+  clearLegacyFrames(outer);
   var cr = getOrCreateSubFrame(outer, 'DocCol');
   var content = cr.frame;
   content.fills = []; content.layoutMode = 'HORIZONTAL'; content.itemSpacing = 4;
@@ -143,6 +145,7 @@ async function buildGradientsFrame(wrapper) {
   var outer = res.frame;
   configDocCol(outer, FRAME_W);
   await ensureDocPanel(outer, { 'Epic#134:14': 'Styles', 'Instance/State#134:16': 'Gradients', 'Purpose#134:18': 'Gradient paint styles used across the project.', 'Show purpose#227:81': true });
+  clearLegacyFrames(outer);
   var cr = getOrCreateSubFrame(outer, 'DocWrap');
   var content = cr.frame;
   configDocWrap(content, CONTENT_W);
@@ -195,6 +198,7 @@ async function buildEffectsFrame(wrapper) {
   var outer = res.frame;
   configDocCol(outer, FRAME_W);
   await ensureDocPanel(outer, { 'Epic#134:14': 'Styles', 'Instance/State#134:16': 'Effects', 'Purpose#134:18': 'Effect styles (shadows and blurs) used across the project.', 'Show purpose#227:81': true });
+  clearLegacyFrames(outer);
   var cr = getOrCreateSubFrame(outer, 'DocWrap');
   var content = cr.frame;
   configDocWrap(content, CONTENT_W);

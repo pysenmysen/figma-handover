@@ -57,6 +57,17 @@ function clearChildren(frame) {
   while (frame.children.length > 0) frame.children[frame.children.length - 1].remove();
 }
 
+// Remove any legacy or duplicate FRAME children from an outer frame.
+// Keeps only INSTANCE children (i.e. the Doc/Default panel).
+// Call before getOrCreateSubFrame to avoid stale named frames accumulating.
+function clearLegacyFrames(outer) {
+  var toRemove = [];
+  for (var i = 0; i < outer.children.length; i++) {
+    if (outer.children[i].type === 'FRAME') toRemove.push(outer.children[i]);
+  }
+  toRemove.forEach(function(n) { n.remove(); });
+}
+
 function placeFrame(frame) {
   figma.viewport.scrollAndZoomIntoView([frame]);
 }
@@ -71,7 +82,7 @@ function placeFrame(frame) {
 // VERTICAL, fixed width, hug height
 function configDocRows(frame, width) {
   frame.fills = []; frame.clipsContent = false;
-  frame.layoutMode = 'VERTICAL'; frame.itemSpacing = 16;
+  frame.layoutMode = 'VERTICAL'; frame.itemSpacing = 4;
   frame.layoutAlign = 'STRETCH';
   frame.resize(width || CONTENT_W, frame.height > 10 ? frame.height : 100);
   frame.counterAxisSizingMode = 'FIXED'; // fix width
@@ -81,7 +92,7 @@ function configDocRows(frame, width) {
 // HORIZONTAL, fixed width, hug height
 function configDocCol(frame, width) {
   frame.fills = []; frame.clipsContent = false;
-  frame.layoutMode = 'HORIZONTAL'; frame.itemSpacing = 20;
+  frame.layoutMode = 'HORIZONTAL'; frame.itemSpacing = 4;
   frame.layoutAlign = 'STRETCH';
   frame.resize(width || FRAME_W, frame.height > 10 ? frame.height : 100);
   frame.primaryAxisSizingMode = 'FIXED'; // fix width
@@ -119,7 +130,7 @@ function createDocRow(parent, name) {
 // Sets horizontal auto-layout with fixed width + hug height (most common outer frame pattern)
 function setupOuterFrame(frame, isNew) {
   frame.fills = []; frame.clipsContent = false;
-  frame.layoutMode = 'HORIZONTAL'; frame.itemSpacing = 20;
+  frame.layoutMode = 'HORIZONTAL'; frame.itemSpacing = 4;
   frame.layoutAlign = 'STRETCH';
   // Set sizing modes before resize so AUTO height is respected
   frame.primaryAxisSizingMode = 'FIXED';
