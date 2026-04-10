@@ -486,12 +486,8 @@ function effectToCss(effects) {
       var cl = e.color;
       var inset = e.type === 'INNER_SHADOW' ? 'inset ' : '';
       var spread = e.spread !== undefined ? e.spread : 0;
-      var colourValue;
-      if (e.boundVariables && e.boundVariables.color) {
-        var bv = figma.variables.getVariableById(e.boundVariables.color.id);
-        colourValue = bv ? 'var(--' + bv.name.replace(/\//g, '-').toLowerCase() + ')' : null;
-      }
-      if (!colourValue) colourValue = 'rgba(' + Math.round(cl.r*255) + ',' + Math.round(cl.g*255) + ',' + Math.round(cl.b*255) + ',' + Math.round(cl.a*100)/100 + ')';
+      // Always show raw rgba — variable name is shown separately as a datapoint
+      var colourValue = 'rgba(' + Math.round(cl.r*255) + ',' + Math.round(cl.g*255) + ',' + Math.round(cl.b*255) + ',' + Math.round(cl.a*100)/100 + ')';
       parts.push(inset + e.offset.x + 'px ' + e.offset.y + 'px ' + e.radius + 'px ' + spread + 'px ' + colourValue);
     } else if (e.type === 'LAYER_BLUR' || e.type === 'BACKGROUND_BLUR') {
       parts.push('blur(' + e.radius + 'px)');
