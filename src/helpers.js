@@ -90,9 +90,9 @@ function configDocRows(frame, width, gap) {
 }
 
 // HORIZONTAL, fixed width, hug height
-function configDocCol(frame, width) {
+function configDocCol(frame, width, gap) {
   frame.fills = []; frame.clipsContent = false;
-  frame.layoutMode = 'HORIZONTAL'; frame.itemSpacing = 4;
+  frame.layoutMode = 'HORIZONTAL'; frame.itemSpacing = gap !== undefined ? gap : 4;
   frame.layoutAlign = 'STRETCH';
   frame.resize(width || FRAME_W, frame.height > 10 ? frame.height : 100);
   frame.primaryAxisSizingMode = 'FIXED'; // fix width

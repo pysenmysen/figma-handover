@@ -30,7 +30,7 @@ async function buildPrimitivesFrame(col, wrapper) {
   var colComp = await figma.importComponentByKeyAsync(KEYS.colourPrimitive);
   var res = getOrCreateSubFrame(wrapper, col.name);
   var outer = res.frame;
-  configDocCol(outer, FRAME_W);
+  configDocCol(outer, FRAME_W, 16);
   await ensureDocPanel(outer, {
     'Epic#134:14': 'Colour', 'Instance/State#134:16': col.name,
     'Purpose#134:18': 'Primitive colour tokens. Not used directly in project files - applied via semantic variables in themes/modes.',
@@ -90,7 +90,7 @@ async function buildThemesFrame(col, wrapper) {
   var colourComp = await figma.importComponentByKeyAsync(KEYS.themesColour);
   var res = getOrCreateSubFrame(wrapper, col.name);
   var outer = res.frame;
-  configDocCol(outer, FRAME_W);
+  configDocCol(outer, FRAME_W, 16);
   await ensureDocPanel(outer, {
     'Epic#134:14': 'Colour', 'Instance/State#134:16': col.name,
     'Purpose#134:18': 'Semantic colour tokens mapped to primitives per mode. Each column must have its theme applied manually in Figma for the MCP to read the correct resolved colours.',
@@ -143,7 +143,7 @@ async function buildGradientsFrame(wrapper) {
   var gradComp = await figma.importComponentByKeyAsync(KEYS.gradientCard);
   var res = getOrCreateSubFrame(wrapper, 'Gradients');
   var outer = res.frame;
-  configDocCol(outer, FRAME_W);
+  configDocCol(outer, FRAME_W, 16);
   await ensureDocPanel(outer, { 'Epic#134:14': 'Styles', 'Instance/State#134:16': 'Gradients', 'Purpose#134:18': 'Gradient paint styles used across the project.', 'Show purpose#227:81': true });
   clearLegacyFrames(outer);
   var cr = getOrCreateSubFrame(outer, 'DocWrap');
@@ -196,7 +196,7 @@ async function buildEffectsFrame(wrapper) {
   var effectComp = await figma.importComponentByKeyAsync(KEYS.effectCard);
   var res = getOrCreateSubFrame(wrapper, 'Effects');
   var outer = res.frame;
-  configDocCol(outer, FRAME_W);
+  configDocCol(outer, FRAME_W, 16);
   await ensureDocPanel(outer, { 'Epic#134:14': 'Styles', 'Instance/State#134:16': 'Effects', 'Purpose#134:18': 'Effect styles (shadows and blurs) used across the project.', 'Show purpose#227:81': true });
   clearLegacyFrames(outer);
   var cr = getOrCreateSubFrame(outer, 'DocWrap');
