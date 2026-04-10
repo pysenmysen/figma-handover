@@ -14,8 +14,7 @@ var KEYS = {
   sectionOther:    'eb7778ad03fc3564e5b9c25cdeae1743a5233402',
   sectionOption:   'fcd2f3c2808271c76d581b54e0cea7679c9fee3d',
   typographyStyle: '39f846162ae664e4774bb26add863e258b437bb1', // Typography/Style Type=Primary
-  slotsDatapoints: 'ad778223387dceae3c70f6960381248b08df782a', // Slots/Datapoints State=Default
-  slotsDataRow:    '98522e2f7df75b6a59071e8f910f91059ad21ec8', // Slots/Datapoints/DataRow Type=Default
+  typographySlot:  'e0f20829328d45fb0f5de235069bef08a808bca5', // Slots/Typography State=Default
 };
 
 figma.showUI(__html__, { width: 480, height: 600, themeColors: true });
@@ -251,14 +250,17 @@ function formatLetterSpacing(ls) {
 // ══════════════════════════════════════════════════════════════════════════════
 // TYPOGRAPHY — uses Typography/Style component instances
 // ══════════════════════════════════════════════════════════════════════════════
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TYPOGRAPHY — uses Typography/Style + Slots/Typography components
+// ══════════════════════════════════════════════════════════════════════════════
 async function buildTypography() {
   var textStyles = figma.getLocalTextStyles();
   if (!textStyles.length) return;
 
   var typoComp = await figma.importComponentByKeyAsync(KEYS.typographyStyle);
   var docComp  = await figma.importComponentByKeyAsync(KEYS.docModule);
-  var dpComp   = await figma.importComponentByKeyAsync(KEYS.slotsDatapoints);
-  var drComp   = await figma.importComponentByKeyAsync(KEYS.slotsDataRow);
+  var typoSlot = await figma.importComponentByKeyAsync(KEYS.typographySlot);
 
   // Group styles by first path segment, preserve Figma order
   var groups = {}, groupOrder = [];
@@ -281,17 +283,21 @@ async function buildTypography() {
     'Misc':      'Used for UI labels, buttons, tags, and inputs. Regular and Medium (500) variants. Minimum 16px to prevent iOS Safari zoom.'
   };
 
+  var weightNames = {
+    '100': 'Thin', '200': 'Extra Light', '300': 'Light', '400': 'Regular',
+    '450': 'Roman', '500': 'Medium', '600': 'Semi Bold',
+    '700': 'Bold', '800': 'Extra Bold', '900': 'Black'
+  };
+
   for (var gi = 0; gi < groupOrder.length; gi++) {
     var gKey = groupOrder[gi];
     var g = groups[gKey];
 
-    // Map group name to variant type
     var variantType = 'Primary';
     var gKeyL = gKey.toLowerCase();
     if (gKeyL === 'secondary') variantType = 'Secondary';
     else if (gKeyL === 'misc' || gKeyL === 'miscellaneous') variantType = 'Misc';
 
-    // Group row: Doc panel + styles column side by side
     var secRow = figma.createFrame();
     secRow.name = gKey; secRow.fills = [];
     secRow.layoutMode = 'HORIZONTAL'; secRow.itemSpacing = 16;
@@ -299,9 +305,27 @@ async function buildTypography() {
     secRow.layoutAlign = 'STRETCH';
     outer.appendChild(secRow);
 
-    // ── Doc panel ────────────────────────────────────────────────────────────
-    var fontFamily = g.styles[0].fontName ? g.styles[0].fontName.family : '—';
+    // ── Font family + unique weights ──────────────────────────────────────────
+    var fontFamily = g.styles[0].fontName ? g.styles[0].fontName.family : '\u2014';
+    var seenWeights = {}, weightLines = [];
+    g.styles.forEach(function(s) {
+      if (!s.fontName) return;
+      var num = styleToWeight(s.fontName.style);
+      var styleName = s.fontName.style;
+      var key = num + styleName;
+      if (!seenWeights[key]) {
+        seenWeights[key] = true;
+        var label = weightNames[num] || styleName;
+        // Append any suffix not covered by the mapped name (e.g. "Italic")
+        var stripped = styleName.replace(/\b(Extra\s)?Light\b|\bRegular\b|\bMedium\b|\b(Semi\s)?Bold\b|\b(Extra\s)?Bold\b|\bThin\b|\bBlack\b|\bHeavy\b|\bRoman\b/gi, '').trim();
+        if (stripped) label = label + ' ' + stripped;
+        weightLines.push(num + ' - ' + label.trim());
+      }
+    });
+    weightLines.sort(function(a, b) { return parseInt(a) - parseInt(b); });
+    var weightsText = weightLines.join('\n');
 
+    // ── Doc panel ─────────────────────────────────────────────────────────────
     var docInst = docComp.createInstance();
     secRow.appendChild(docInst);
 
@@ -312,32 +336,38 @@ async function buildTypography() {
       'Show purpose#227:81':   true,
       'Show sections#226:79':  true,
     };
-    // Auto-detect booleans: turn off data-related toggles
     try {
       var instProps = docInst.componentProperties;
       Object.keys(instProps).forEach(function(k) {
         if (instProps[k].type === 'BOOLEAN') {
-          var kl = k.toLowerCase();
-          if (kl.indexOf('data') !== -1) docProps[k] = false;
+          if (k.toLowerCase().indexOf('data') !== -1) docProps[k] = false;
         }
       });
     } catch(e) {}
     docInst.setProperties(docProps);
 
-    // Populate Sections slot — DataRow directly (nested slot modification not supported by plugin API)
+    // Slots/Typography into Sections slot
     try {
       var sectionsSlot = docInst.findOne(function(n) { return n.name === 'Sections'; });
       if (sectionsSlot) {
         while (sectionsSlot.children.length > 0) sectionsSlot.children[sectionsSlot.children.length - 1].remove();
 
-        var row = drComp.createInstance();
-        try { row.setProperties({ 'Show DataSource#237:108': false, 'Required#134:10': false }); } catch(e) {}
-        sectionsSlot.appendChild(row);
+        var tsInst = typoSlot.createInstance();
+        sectionsSlot.appendChild(tsInst);
 
-        var dpT = row.findOne(function(n) { return n.name === 'Datapoint' && n.type === 'TEXT'; });
-        var vrT = row.findOne(function(n) { return n.name === 'Value/rule' && n.type === 'TEXT'; });
-        if (dpT) { try { dpT.characters = 'Font family'; } catch(e) {} }
-        if (vrT) { try { vrT.characters = fontFamily; } catch(e) {} }
+        // Row 0 = FontFamily row — set both text nodes in FontContainer
+        try {
+          var ffRow = tsInst.children[0];
+          var ffNodes = ffRow.findAll(function(n) { return n.type === 'TEXT' && n.name !== 'Label'; });
+          ffNodes.forEach(function(n) { try { n.characters = fontFamily; } catch(e) {} });
+        } catch(e) {}
+
+        // Row 1 = Weights row — find the value text node
+        try {
+          var wtRow = tsInst.children[1];
+          var wtText = wtRow.findOne(function(n) { return n.type === 'TEXT' && n.name !== 'Label'; });
+          if (wtText) { try { wtText.characters = weightsText; } catch(e) {} }
+        } catch(e) {}
       }
     } catch(e) {}
 
@@ -345,7 +375,7 @@ async function buildTypography() {
     var stylesCol = figma.createFrame();
     stylesCol.name = 'TextStyles'; stylesCol.fills = [];
     stylesCol.layoutMode = 'VERTICAL'; stylesCol.itemSpacing = 4;
-    stylesCol.resize(FRAME_W - 320 - 16, 100); // 1168px explicit before FIXED mode
+    stylesCol.resize(FRAME_W - 320 - 16, 100);
     stylesCol.primaryAxisSizingMode = 'AUTO'; stylesCol.counterAxisSizingMode = 'FIXED';
     stylesCol.layoutGrow = 1; stylesCol.layoutAlign = 'INHERIT';
     secRow.appendChild(stylesCol);
@@ -356,13 +386,13 @@ async function buildTypography() {
       inst.layoutAlign = 'STRETCH';
       stylesCol.appendChild(inst);
 
-      var styleName = style.name.split('/').pop();
+      var sName = style.name.split('/').pop();
       var fs = Math.round(style.fontSize) + ' px';
       var lh = formatLineHeight(style.lineHeight);
       var wt = styleToWeight(style.fontName ? style.fontName.style : '');
       var ls = formatLetterSpacing(style.letterSpacing);
 
-      var content = variantType === 'Primary'
+      var previewContent = variantType === 'Primary'
         ? 'Primary\nSecond line'
         : variantType === 'Secondary'
         ? 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nisi, gravida mauris ut lectus blandit tortor hendrerit. Commodo adipiscing et in vitae auctor diam amet, est est.'
@@ -371,22 +401,21 @@ async function buildTypography() {
       try {
         inst.setProperties({
           'Type':                  variantType,
-          'Style name#238:110':    styleName,
+          'Style name#238:110':    sName,
           'Font-size#205:43':      fs,
           'Line-height#205:47':    lh,
           'Weight#205:51':         wt,
           'Letter-spacing#205:55': ls,
-          'Content#203:16':        content,
+          'Content#203:16':        previewContent,
         });
       } catch(e) {}
 
-      // Apply actual text style to the preview text node
+      // Apply text style THEN override characters so content wins
       try {
         var previewT = inst.findOne(function(n) { return n.name === 'TextStyle' && n.type === 'TEXT'; });
         if (previewT) {
-          try { previewT.textStyleId = style.id; } catch(e) {
-            try { previewT.fontSize = style.fontSize; } catch(e2) {}
-          }
+          try { previewT.textStyleId = style.id; } catch(e) {}
+          try { previewT.characters = previewContent; } catch(e) {}
         }
       } catch(e) {}
     }
@@ -394,6 +423,7 @@ async function buildTypography() {
 
   placeFrame(outer);
 }
+
 
 
 function effectToCss(effects) {
