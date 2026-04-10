@@ -278,9 +278,9 @@ async function buildTypography() {
   outer.resize(FRAME_W, 100);
 
   var purposes = {
-    'Primary':   'Used for headings and display text. Tight line-height is intentional at large sizes.',
-    'Secondary': 'Used for body and editorial text. Regular and Medium (500) weight variants available.',
-    'Misc':      'Used for UI labels, buttons, tags, and inputs. Regular and Medium (500) variants. Minimum 16px to prevent iOS Safari zoom.'
+    'Primary':   'Used for headings and display text.',
+    'Secondary': 'Used for body and editorial text.',
+    'Misc':      'Used for UI labels, buttons, tags, and inputs.'
   };
 
   var weightNames = {
@@ -378,19 +378,38 @@ async function buildTypography() {
     } catch(e) {}
 
     // ── Styles column ─────────────────────────────────────────────────────────
+    var isMisc = variantType === 'Misc';
+    var colW = FRAME_W - 320 - 16; // 1168px
+    var cardW = isMisc ? 582 : colW;
     var stylesCol = figma.createFrame();
     stylesCol.name = 'TextStyles'; stylesCol.fills = [];
-    stylesCol.layoutMode = 'VERTICAL'; stylesCol.itemSpacing = 4;
-    stylesCol.resize(FRAME_W - 320 - 16, 100);
+    stylesCol.resize(colW, 100);
     stylesCol.primaryAxisSizingMode = 'AUTO'; stylesCol.counterAxisSizingMode = 'FIXED';
     stylesCol.layoutGrow = 1; stylesCol.layoutAlign = 'INHERIT';
+    if (isMisc) {
+      stylesCol.layoutMode = 'HORIZONTAL'; stylesCol.layoutWrap = 'WRAP';
+      stylesCol.itemSpacing = 4; stylesCol.counterAxisSpacing = 4;
+    } else {
+      stylesCol.layoutMode = 'VERTICAL'; stylesCol.itemSpacing = 4;
+    }
     secRow.appendChild(stylesCol);
 
     for (var si = 0; si < g.styles.length; si++) {
       var style = g.styles[si];
       var inst = typoComp.createInstance();
-      inst.layoutAlign = 'STRETCH';
+      if (isMisc) {
+        inst.resize(cardW, 100); // set before adding to auto-layout
+        inst.layoutAlign = 'INHERIT';
+      } else {
+        inst.layoutAlign = 'STRETCH';
+      }
       stylesCol.appendChild(inst);
+      if (isMisc) {
+        // re-apply fixed width after append (auto-layout may reset it)
+        inst.primaryAxisSizingMode = 'FIXED';
+        inst.counterAxisSizingMode = 'AUTO';
+        inst.resize(cardW, inst.height);
+      }
 
       var sName = style.name.split('/').pop();
       var fs = Math.round(style.fontSize) + ' px';
