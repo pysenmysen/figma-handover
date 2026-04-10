@@ -65,13 +65,17 @@ function placeFrame(frame) {
 // Modes set BEFORE resize so AUTO takes effect correctly.
 
 // VERTICAL, fixed width, hug height
+// resize() FIRST, then set sizing modes.
+// If modes are set before resize(), resize() overrides AUTO and locks height.
+
+// VERTICAL, fixed width, hug height
 function configDocRows(frame, width) {
   frame.fills = []; frame.clipsContent = false;
   frame.layoutMode = 'VERTICAL'; frame.itemSpacing = 16;
   frame.layoutAlign = 'STRETCH';
-  frame.counterAxisSizingMode = 'FIXED';  // width fixed
-  frame.primaryAxisSizingMode = 'AUTO';   // height hugs
-  frame.resize(width || CONTENT_W, 1);    // set fixed width; height auto
+  frame.resize(width || CONTENT_W, frame.height > 10 ? frame.height : 100);
+  frame.counterAxisSizingMode = 'FIXED'; // fix width
+  frame.primaryAxisSizingMode = 'AUTO';  // hug height
 }
 
 // HORIZONTAL, fixed width, hug height
@@ -79,9 +83,9 @@ function configDocCol(frame, width) {
   frame.fills = []; frame.clipsContent = false;
   frame.layoutMode = 'HORIZONTAL'; frame.itemSpacing = 20;
   frame.layoutAlign = 'STRETCH';
-  frame.primaryAxisSizingMode = 'FIXED';  // width fixed
-  frame.counterAxisSizingMode = 'AUTO';   // height hugs
-  frame.resize(width || FRAME_W, 1);      // set fixed width; height auto
+  frame.resize(width || FRAME_W, frame.height > 10 ? frame.height : 100);
+  frame.primaryAxisSizingMode = 'FIXED'; // fix width
+  frame.counterAxisSizingMode = 'AUTO';  // hug height
 }
 
 // HORIZONTAL + WRAP, fixed width, hug height
@@ -90,9 +94,9 @@ function configDocWrap(frame, width) {
   frame.layoutMode = 'HORIZONTAL'; frame.layoutWrap = 'WRAP';
   frame.itemSpacing = 4; frame.counterAxisSpacing = 4;
   frame.layoutAlign = 'STRETCH';
-  frame.primaryAxisSizingMode = 'FIXED';  // width fixed (required for wrap)
-  frame.counterAxisSizingMode = 'AUTO';   // height hugs
-  frame.resize(width || CONTENT_W, 1);    // set fixed width; height auto
+  frame.resize(width || CONTENT_W, frame.height > 10 ? frame.height : 100);
+  frame.primaryAxisSizingMode = 'FIXED'; // fix width (required for wrap)
+  frame.counterAxisSizingMode = 'AUTO';  // hug height
 }
 
 
