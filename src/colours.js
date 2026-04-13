@@ -148,7 +148,7 @@ async function buildGradientsFrame(wrapper) {
   clearLegacyFrames(outer);
   var cr = getOrCreateSubFrame(outer, 'DocWrap');
   var content = cr.frame;
-  configDocWrap(content, CONTENT_W);
+  configDocWrap(content, WRAP_W);
   clearChildren(content);
   for (var gi = 0; gi < gradients.length; gi++) {
     var grad = gradients[gi];
@@ -201,7 +201,7 @@ async function buildEffectsFrame(wrapper) {
   clearLegacyFrames(outer);
   var cr = getOrCreateSubFrame(outer, 'DocWrap');
   var content = cr.frame;
-  configDocWrap(content, CONTENT_W);
+  configDocWrap(content, WRAP_W);
   clearChildren(content);
   var labels = { DROP_SHADOW: 'Drop shadow', INNER_SHADOW: 'Inner shadow', LAYER_BLUR: 'Layer blur', BACKGROUND_BLUR: 'Background blur' };
   for (var ei = 0; ei < effects.length; ei++) {

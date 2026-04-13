@@ -108,7 +108,7 @@ async function buildTypography() {
     }
     secRow.appendChild(stylesCol);
 
-    var cardW = isMisc ? 582 : colW;
+    var cardW = isMisc ? WRAP_W : colW;
     for (var si = 0; si < g.styles.length; si++) {
       var style = g.styles[si];
       var inst = typoComp.createInstance();

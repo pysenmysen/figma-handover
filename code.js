@@ -9,6 +9,7 @@
 var VERSION = '10.0';
 var FRAME_W    = 1504;
 var CONTENT_W  = FRAME_W - 320 - 20; // width of content area next to Doc/Default (1164px)
+var WRAP_W     = 580;                  // width of wrapped card grids (Gradients, Effects, Misc typo)
 
 var KEYS = {
   docModule:       '8df1ea68f02f91062978acb1ccbab2cec2e92171', // Doc/Default State=Default
@@ -430,7 +431,7 @@ async function buildGradientsFrame(wrapper) {
   clearLegacyFrames(outer);
   var cr = getOrCreateSubFrame(outer, 'DocWrap');
   var content = cr.frame;
-  configDocWrap(content, CONTENT_W);
+  configDocWrap(content, WRAP_W);
   clearChildren(content);
   for (var gi = 0; gi < gradients.length; gi++) {
     var grad = gradients[gi];
@@ -483,7 +484,7 @@ async function buildEffectsFrame(wrapper) {
   clearLegacyFrames(outer);
   var cr = getOrCreateSubFrame(outer, 'DocWrap');
   var content = cr.frame;
-  configDocWrap(content, CONTENT_W);
+  configDocWrap(content, WRAP_W);
   clearChildren(content);
   var labels = { DROP_SHADOW: 'Drop shadow', INNER_SHADOW: 'Inner shadow', LAYER_BLUR: 'Layer blur', BACKGROUND_BLUR: 'Background blur' };
   for (var ei = 0; ei < effects.length; ei++) {
@@ -635,7 +636,7 @@ async function buildTypography() {
     }
     secRow.appendChild(stylesCol);
 
-    var cardW = isMisc ? 582 : colW;
+    var cardW = isMisc ? WRAP_W : colW;
     for (var si = 0; si < g.styles.length; si++) {
       var style = g.styles[si];
       var inst = typoComp.createInstance();
