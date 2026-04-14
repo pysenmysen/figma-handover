@@ -74,6 +74,9 @@ figma.ui.onmessage = async function(msg) {
     styleSelectedFrames();
     figma.ui.postMessage({ type: 'selection', items: getSelectionInfo() });
   }
+  if (msg.type === 'apply-icon-size') {
+    applyIconSize();
+  }
   if (msg.type === 'close') figma.closePlugin();
 };
 

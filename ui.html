@@ -126,6 +126,13 @@
           </div>
           <button class="btn-gen" onclick="applyStyle()">Apply</button>
         </div>
+        <div class="section-card" style="justify-content:space-between;align-items:center">
+          <div>
+            <div class="section-name">Set icon size variant</div>
+            <div class="section-meta">8px&#8594;xs &nbsp; 12px&#8594;sm &nbsp; 16px&#8594;md &nbsp; 20px&#8594;lg &nbsp; 24px&#8594;xl</div>
+          </div>
+          <button class="btn-gen" onclick="applyIconSize()">Apply</button>
+        </div>
       </div>
     </div>
   </div>
@@ -212,6 +219,10 @@ window.onmessage = function(e) {
   if (msg.type === 'style-done') {
     document.getElementById('footer-note').textContent = 'Styled ' + msg.count + ' frame' + (msg.count !== 1 ? 's' : '') + '.';
   }
+
+  if (msg.type === 'size-done') {
+    document.getElementById('footer-note').textContent = 'Updated ' + msg.updated + ' icon' + (msg.updated !== 1 ? 's' : '') + (msg.skipped ? ', skipped ' + msg.skipped : '') + '.';
+  }
 };
 
 function renderSelection(selItems) {
@@ -234,6 +245,10 @@ function renderSelection(selItems) {
 
 function applyStyle() {
   parent.postMessage({ pluginMessage: { type: 'style-frames' } }, '*');
+}
+
+function applyIconSize() {
+  parent.postMessage({ pluginMessage: { type: 'apply-icon-size' } }, '*');
 }
 
 function renderList() {

@@ -926,6 +926,70 @@ function getSelectionInfo() {
   });
 }
 
+// Size map: pixel dimension -> Size variant value
+var ICON_SIZE_MAP = [
+  { px: 8,  size: 'xs' },
+  { px: 12, size: 'sm' },
+  { px: 16, size: 'md' },
+  { px: 20, size: 'lg' },
+  { px: 24, size: 'xl' },
+];
+
+function applyIconSize() {
+  var sel = figma.currentPage.selection;
+  if (!sel.length) { figma.ui.postMessage({ type: 'error', message: 'Nothing selected.' }); return; }
+
+  var updated = 0, skipped = 0;
+
+  for (var i = 0; i < sel.length; i++) {
+    var node = sel[i];
+
+    // Accept instances or component sets containing icon variants
+    var targets = [];
+    if (node.type === 'INSTANCE') {
+      targets = [node];
+    } else if (node.type === 'COMPONENT_SET') {
+      // Apply to all variant components inside
+      for (var ci = 0; ci < node.children.length; ci++) {
+        if (node.children[ci].type === 'COMPONENT') targets.push(node.children[ci]);
+      }
+    }
+
+    for (var ti = 0; ti < targets.length; ti++) {
+      var target = targets[ti];
+      var dim = Math.round(target.width); // icons are square - use width
+
+      // Find matching size
+      var sizeVal = null;
+      for (var si = 0; si < ICON_SIZE_MAP.length; si++) {
+        if (ICON_SIZE_MAP[si].px === dim) { sizeVal = ICON_SIZE_MAP[si].size; break; }
+      }
+
+      if (!sizeVal) { skipped++; continue; }
+
+      // Set Size variant property
+      try {
+        if (target.type === 'INSTANCE') {
+          target.setProperties({ 'Size': sizeVal });
+        } else if (target.type === 'COMPONENT') {
+          // Rename variant: e.g. "Size=md" - update the variant name
+          var parts = target.name.split(',').map(function(p) { return p.trim(); });
+          var found = false;
+          parts = parts.map(function(p) {
+            if (p.toLowerCase().indexOf('size=') !== -1) { found = true; return 'Size=' + sizeVal; }
+            return p;
+          });
+          if (!found) parts.push('Size=' + sizeVal);
+          target.name = parts.join(', ');
+        }
+        updated++;
+      } catch(e) { skipped++; }
+    }
+  }
+
+  figma.ui.postMessage({ type: 'size-done', updated: updated, skipped: skipped });
+}
+
 
 // ============================================================
 // src/main.js
@@ -1005,6 +1069,9 @@ figma.ui.onmessage = async function(msg) {
   if (msg.type === 'style-frames') {
     styleSelectedFrames();
     figma.ui.postMessage({ type: 'selection', items: getSelectionInfo() });
+  }
+  if (msg.type === 'apply-icon-size') {
+    applyIconSize();
   }
   if (msg.type === 'close') figma.closePlugin();
 };
